@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
@@ -40,18 +41,17 @@ export default function ServicesPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 rounded-2xl" />
+            <Skeleton key={i} className="h-12 rounded-4xl" />
           ))
         ) : services.length === 0 ? (
           <p className="text-sm text-muted-foreground">No services found.</p>
         ) : (
           services.map((s) => (
-            <div
-              key={s._id}
-              className="flex items-center rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium"
-            >
-              {s.name}
-            </div>
+            <Card key={s._id}>
+              <CardContent className="flex items-center text-sm font-medium">
+                {s.name}
+              </CardContent>
+            </Card>
           ))
         )}
       </div>
