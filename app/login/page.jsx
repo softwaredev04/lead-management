@@ -31,6 +31,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
         <div className="mb-6 text-center">
+          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
+            C
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight">ClickMasters LMS</h1>
           <p className="mt-1 text-sm text-muted-foreground">Sign in to your dashboard</p>
         </div>
@@ -45,9 +48,10 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               required
+              disabled={loading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-60"
               placeholder="admin@clickmasters.com"
             />
           </div>
@@ -61,9 +65,10 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               required
+              disabled={loading}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30"
+              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 disabled:opacity-60"
               placeholder="••••••••"
             />
           </div>

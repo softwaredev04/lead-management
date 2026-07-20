@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const STATUSES = ["New", "Contacted", "Closed", "Spam"];
 
@@ -11,7 +13,7 @@ function Field({ label, value }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm">{value || "—"}</dd>
+      <dd className="mt-1 break-words text-sm">{value || "—"}</dd>
     </div>
   );
 }
@@ -55,9 +57,7 @@ export default function LeadDetailsPage() {
     setError("");
     setSaved(false);
     try {
-      const notesArray = notes.trim()
-        ? [{ text: notes.trim() }]
-        : lead.notes || [];
+      const notesArray = notes.trim() ? [{ text: notes.trim() }] : lead.notes || [];
       const updated = await api.updateLead(id, { status, service, notes: notesArray });
       setLead(updated);
       setNotes("");
@@ -69,29 +69,45 @@ export default function LeadDetailsPage() {
     }
   }
 
-  if (error && !lead) return <p className="text-sm text-destructive">{error}</p>;
-  if (!lead) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (error && !lead)
+    return (
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        {error}
+      </div>
+    );
+
+  if (!lead)
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    );
 
   const utm = lead.utm || {};
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <Link href="/leads" className="text-sm text-primary hover:underline">
             ← Back to Leads
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{lead.name}</h1>
         </div>
-        <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium">{lead.status}</span>
+        <StatusBadge status={lead.status} />
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {saved && <p className="text-sm text-emerald-600">Saved.</p>}
+      {error && (
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+      {saved && <p className="text-sm text-emerald-600">Changes saved.</p>}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Lead info */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="mb-4 text-base font-medium">Lead Information</h2>
             <dl className="grid grid-cols-2 gap-4">
@@ -128,11 +144,10 @@ export default function LeadDetailsPage() {
 
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="mb-4 text-base font-medium">Message</h2>
-            <p className="whitespace-pre-wrap text-sm">{lead.message || "—"}</p>
+            <p className="whitespace-pre-wrap break-words text-sm">{lead.message || "—"}</p>
           </section>
         </div>
 
-        {/* Editable panel */}
         <div className="space-y-6">
           <section className="rounded-2xl border border-border bg-card p-5">
             <h2 className="mb-4 text-base font-medium">Manage</h2>
@@ -142,7 +157,7 @@ export default function LeadDetailsPage() {
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none"
+                  className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -155,7 +170,7 @@ export default function LeadDetailsPage() {
                 <select
                   value={service}
                   onChange={(e) => setService(e.target.value)}
-                  className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none"
+                  className="h-9 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring"
                 >
                   <option value="">—</option>
                   {services.map((s) => (
@@ -178,7 +193,7 @@ export default function LeadDetailsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="h-9 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
+                className="h-9 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80 disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save Changes"}
               </button>
