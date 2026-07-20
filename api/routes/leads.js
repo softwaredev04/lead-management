@@ -26,6 +26,65 @@ const createSchema = z.object({
   utm_content: z.string().optional(),
 });
 
+// GET /api/leads/stats — dashboard counts
+router.get("/stats", requireAuth, async (_req, res) => {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfMonth = new Date(startOfDay.getFullYear(), startOfDay.getMonth(), 1);
+
+  const [total, byStatus, today, thisMonth] = await Promise.all([
+    Lead.countDocuments({}),
+    Lead.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Lead.countDocuments({ createdAt: { $gte: startOfDay } }),
+    Lead.countDocuments({ createdAt: { $gte: startOfMonth } }),
+  ]);
+
+  const statusMap = { New: 0, Contacted: 0, Closed: 0, Spam: 0 };
+  for (const row of byStatus) statusMap[row._id] = row.count;
+
+  res.json({
+    total,
+    today,
+    thisMonth,
+    new: statusMap.New,
+    contacted: statusMap.Contacted,
+    closed: statusMap.Closed,
+    spam: statusMap.Spam,
+  });
+});
+
+// GET /api/leads/charts — daily / by-website / by-service
+router.get("/charts", requireAuth, async (_req, res) => {
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  const [daily, byWebsite, byService] = await Promise.all([
+    Lead.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]),
+    Lead.aggregate([{ $group: { _id: "$website", count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+    Lead.aggregate([
+      { $match: { service: { $exists: true, $ne: null } } },
+      { $group: { _id: "$service", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  res.json({
+    daily: daily.map((d) => ({ date: d._id, count: d.count })),
+    byWebsite: byWebsite.map((d) => ({ website: d._id, count: d.count })),
+    byService: byService.map((d) => ({ service: d._id, count: d.count })),
+  });
+});
+
 // GET /api/leads — getAll (search, pagination, sort, filter)
 router.get("/", requireAuth, async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
