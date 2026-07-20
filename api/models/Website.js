@@ -14,7 +14,7 @@ const Website = mongoose.model("Website", websiteSchema);
 
 async function seedWebsites() {
   for (const w of DEFAULT_WEBSITES) {
-    await Website.findOneAndUpdate({ domain: w.domain }, w, { upsert: true, new: true });
+    await Website.findOneAndUpdate({ domain: w.domain }, w, { upsert: true, returnDocument: "after" });
   }
   console.log(`[api] seeded ${DEFAULT_WEBSITES.length} websites`);
 }
@@ -30,7 +30,7 @@ const Service = mongoose.model("Service", serviceSchema);
 
 async function seedServices() {
   for (const name of SERVICES) {
-    await Service.findOneAndUpdate({ name }, { name }, { upsert: true, new: true });
+    await Service.findOneAndUpdate({ name }, { name }, { upsert: true, returnDocument: "after" });
   }
   console.log(`[api] seeded ${SERVICES.length} services`);
 }

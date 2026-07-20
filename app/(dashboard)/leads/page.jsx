@@ -28,6 +28,7 @@ export default function LeadsPage() {
   const [order, setOrder] = useState("desc");
   const [websites, setWebsites] = useState([]);
   const [services, setServices] = useState([]);
+  const [websiteMap, setWebsiteMap] = useState({});
   const [error, setError] = useState("");
 
   const loadFilters = useCallback(async () => {
@@ -35,6 +36,9 @@ export default function LeadsPage() {
       const [w, s] = await Promise.all([api.getWebsites(), api.getServices()]);
       setWebsites(w);
       setServices(s.map((x) => x.name));
+      const map = {};
+      for (const site of w) map[site.domain] = site.name;
+      setWebsiteMap(map);
     } catch (err) {
       setError(err.message);
     }
@@ -180,6 +184,11 @@ export default function LeadsPage() {
                       <Link href={`/leads/${lead._id}`} className="font-medium text-primary hover:underline">
                         {lead.name}
                       </Link>
+                    ) : col.key === "website" ? (
+                      <div>
+                        <p className="font-medium">{websiteMap[lead.website] || lead.website}</p>
+                        <p className="text-xs text-muted-foreground">{lead.website}</p>
+                      </div>
                     ) : col.key === "createdAt" ? (
                       new Date(lead.createdAt).toLocaleDateString()
                     ) : (

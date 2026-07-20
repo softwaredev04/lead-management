@@ -1,5 +1,5 @@
 const nodemailer = require("nodemailer");
-const { Website } = require("../models/Website");
+const Website = require("../models/Website");
 const { visitorTemplate, teamTemplate } = require("./emailTemplates");
 
 let transporter;
@@ -7,12 +7,15 @@ let transporter;
 function getTransporter() {
   if (!process.env.SMTP_HOST) return null;
   if (!transporter) {
+    // Strip spaces from the app password — Gmail shows it spaced (xxxx xxxx xxxx xxxx),
+    // but SMTP needs the raw 16 characters.
+    const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
       secure: Number(process.env.SMTP_PORT) === 465,
       auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        ? { user: process.env.SMTP_USER, pass }
         : undefined,
     });
   }
@@ -22,6 +25,7 @@ function getTransporter() {
 async function notifyNewLead(lead) {
   const website = await Website.findOne({ domain: lead.website }).lean().catch(() => null);
   const from = process.env.SMTP_FROM || process.env.NOTIFY_TO || "no-reply@clickmasters.com";
+  const user = process.env.SMTP_USER;
 
   const t = getTransporter();
   if (!t) {
@@ -30,6 +34,8 @@ async function notifyNewLead(lead) {
     );
     return;
   }
+
+  console.log(`[api] sending emails via ${process.env.SMTP_HOST} as ${user}`);
 
   try {
     // 1) Auto-reply to the visitor
@@ -44,8 +50,9 @@ async function notifyNewLead(lead) {
       const tm = teamTemplate(lead, website);
       await t.sendMail({ from, to: teamTo, subject: tm.subject, text: tm.text, html: tm.html });
     }
+    console.log("[api] emails sent successfully");
   } catch (err) {
-    console.error("[api] email send failed:", err.message);
+    console.error(`[api] email send failed (as ${user}):`, err.message);
   }
 }
 

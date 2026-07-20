@@ -1,5 +1,6 @@
 const express = require("express");
-const { Service } = require("../models/Website");
+const WebsiteModule = require("../models/Website");
+const Service = WebsiteModule.Service;
 const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();

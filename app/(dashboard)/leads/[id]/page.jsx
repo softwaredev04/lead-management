@@ -21,6 +21,7 @@ export default function LeadDetailsPage() {
   const router = useRouter();
   const [lead, setLead] = useState(null);
   const [services, setServices] = useState([]);
+  const [websiteName, setWebsiteName] = useState("");
   const [status, setStatus] = useState("");
   const [service, setService] = useState("");
   const [notes, setNotes] = useState("");
@@ -31,11 +32,17 @@ export default function LeadDetailsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [data, svc] = await Promise.all([api.getLead(id), api.getServices()]);
+        const [data, svc, sites] = await Promise.all([
+          api.getLead(id),
+          api.getServices(),
+          api.getWebsites(),
+        ]);
         setLead(data);
         setStatus(data.status);
         setService(data.service || "");
         setServices(svc.map((x) => x.name));
+        const site = sites.find((w) => w.domain === data.website);
+        setWebsiteName(site ? site.name : "");
       } catch (err) {
         setError(err.message);
       }
@@ -91,7 +98,7 @@ export default function LeadDetailsPage() {
               <Field label="Email" value={lead.email} />
               <Field label="Phone" value={lead.phone} />
               <Field label="Company" value={lead.company} />
-              <Field label="Website" value={lead.website} />
+              <Field label="Website" value={websiteName ? `${websiteName} (${lead.website})` : lead.website} />
               <Field label="Landing Page" value={lead.landingPage} />
               <Field label="Service" value={lead.service} />
               <Field label="Source" value={lead.source} />
