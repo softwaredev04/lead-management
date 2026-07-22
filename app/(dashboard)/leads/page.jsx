@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,10 +27,13 @@ const COLUMNS = [
   { key: "createdAt", label: "Created" },
 ];
 
+const rowCls = "cursor-pointer transition-colors hover:bg-muted/50 border-border";
+
 const selectCls =
   "h-9 rounded-3xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring";
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [leads, setLeads] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -196,13 +199,15 @@ export default function LeadsPage() {
                 </TableRow>
               ) : (
                 leads.map((lead) => (
-                  <TableRow key={lead._id} className="border-border">
+                  <TableRow
+                    key={lead._id}
+                    className={rowCls}
+                    onClick={() => router.push(`/leads/${lead._id}`)}
+                  >
                     {COLUMNS.map((col) => (
                       <TableCell key={col.key}>
                         {col.key === "name" ? (
-                          <Link href={`/leads/${lead._id}`} className="font-medium text-primary hover:underline">
-                            {lead.name}
-                          </Link>
+                          <span className="font-medium text-primary">{lead.name}</span>
                         ) : col.key === "website" ? (
                           <div>
                             <p className="font-medium">{websiteMap[lead.website] || lead.website}</p>
