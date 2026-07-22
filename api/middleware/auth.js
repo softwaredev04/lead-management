@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { NextResponse } = require("next/server");
 
 function signToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -6,19 +7,18 @@ function signToken(payload) {
   });
 }
 
-function requireAuth(req, res, next) {
-  const header = req.headers.authorization;
+function verifyAuth(request) {
+  const header = request.headers.get("authorization");
   if (!header || !header.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return { user: null, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
   const token = header.slice(7);
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.auth = decoded;
-    next();
+    return { user: decoded, response: null };
   } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return { user: null, response: NextResponse.json({ error: "Invalid or expired token" }, { status: 401 }) };
   }
 }
 
-module.exports = { signToken, requireAuth };
+module.exports = { signToken, verifyAuth };

@@ -13,7 +13,7 @@ userSchema.methods.comparePassword = function (plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
-const User = mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 async function seedAdmin() {
   const email = process.env.ADMIN_EMAIL;

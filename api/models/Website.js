@@ -10,7 +10,7 @@ const websiteSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Website = mongoose.model("Website", websiteSchema);
+const Website = mongoose.models.Website || mongoose.model("Website", websiteSchema);
 
 async function seedWebsites() {
   for (const w of DEFAULT_WEBSITES) {
@@ -26,7 +26,7 @@ const serviceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const Service = mongoose.model("Service", serviceSchema);
+const Service = mongoose.models.Service || mongoose.model("Service", serviceSchema);
 
 async function seedServices() {
   for (const name of SERVICES) {

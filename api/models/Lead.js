@@ -43,4 +43,5 @@ const leadSchema = new mongoose.Schema(
 leadSchema.index({ website: 1, status: 1, createdAt: -1 });
 leadSchema.index({ name: "text", email: "text", phone: "text", company: "text", message: "text" });
 
-module.exports = mongoose.model("Lead", leadSchema);
+const Lead = mongoose.models.Lead || mongoose.model("Lead", leadSchema);
+module.exports = Lead;

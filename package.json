@@ -3,12 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n web,api -c cyan,magenta \"next dev\" \"node --watch api/index.js\"",
-    "dev:web": "next dev",
-    "dev:api": "node --watch api/index.js",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "start:api": "node api/index.js",
     "lint": "eslint"
   },
   "dependencies": {

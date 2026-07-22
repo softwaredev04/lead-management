@@ -1,12 +1,9 @@
 function getIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") {
-    return forwarded.split(",")[0].trim();
+  const forwarded = req.headers.get ? req.headers.get("x-forwarded-for") : req.headers["x-forwarded-for"];
+  if (forwarded) {
+    return String(forwarded).split(",")[0].trim();
   }
-  if (Array.isArray(forwarded)) {
-    return forwarded[0];
-  }
-  return req.socket.remoteAddress;
+  return req.ip || "127.0.0.1";
 }
 
 function parseUserAgent(ua) {
@@ -32,7 +29,7 @@ function parseUserAgent(ua) {
 }
 
 function captureDeviceInfo(req) {
-  const userAgent = req.headers["user-agent"];
+  const userAgent = (req.headers.get ? req.headers.get("user-agent") : req.headers["user-agent"]) || "";
   const ipAddress = getIp(req);
   const parsed = userAgent ? parseUserAgent(userAgent) : {};
   return { ipAddress, userAgent, ...parsed };
