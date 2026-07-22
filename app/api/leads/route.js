@@ -7,6 +7,16 @@ import { captureDeviceInfo } from "@/lib/services/geo";
 import { notifyNewLead } from "@/lib/services/email";
 import { SERVICES } from "@/lib/config";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
+}
+
 const createSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
@@ -55,10 +65,13 @@ export async function GET(request) {
       Lead.countDocuments(filter),
     ]);
 
-    return NextResponse.json({ data: leads, page, limit, total, totalPages: Math.ceil(total / limit) });
+    return NextResponse.json(
+      { data: leads, page, limit, total, totalPages: Math.ceil(total / limit) },
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error("Leads GET error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500, headers: corsHeaders });
   }
 }
 
@@ -68,7 +81,10 @@ export async function POST(request) {
     const body = await request.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten() },
+        { status: 400, headers: corsHeaders }
+      );
     }
     const data = parsed.data;
     const device = captureDeviceInfo(request);
@@ -90,9 +106,9 @@ export async function POST(request) {
     });
 
     notifyNewLead(lead);
-    return NextResponse.json(lead, { status: 201 });
+    return NextResponse.json(lead, { status: 201, headers: corsHeaders });
   } catch (error) {
     console.error("Lead create error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500, headers: corsHeaders });
   }
 }
