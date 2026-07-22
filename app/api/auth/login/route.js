@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { connectDB } from "@/api/db";
-import User from "@/api/models/User";
-import { signToken } from "@/api/middleware/auth";
+import { connectDB } from "@/lib/db";
+import User from "@/lib/models/User";
+import { signToken } from "@/lib/auth";
 
 const loginSchema = z.object({
   email: z.string().email(),

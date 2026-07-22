@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { connectDB } from "@/api/db";
-import Lead from "@/api/models/Lead";
-import { verifyAuth } from "@/api/middleware/auth";
-import { captureDeviceInfo } from "@/api/services/geo";
-import { notifyNewLead } from "@/api/services/email";
-import { SERVICES } from "@/api/config";
+import { connectDB } from "@/lib/db";
+import Lead from "@/lib/models/Lead";
+import { verifyAuth } from "@/lib/auth";
+import { captureDeviceInfo } from "@/lib/services/geo";
+import { notifyNewLead } from "@/lib/services/email";
+import { SERVICES } from "@/lib/config";
 
 const createSchema = z.object({
   name: z.string().min(1),

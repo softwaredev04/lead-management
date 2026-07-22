@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { connectDB } from "@/api/db";
-import Lead from "@/api/models/Lead";
-import { verifyAuth } from "@/api/middleware/auth";
-import { LEAD_STATUSES, SERVICES } from "@/api/config";
+import { connectDB } from "@/lib/db";
+import Lead from "@/lib/models/Lead";
+import { verifyAuth } from "@/lib/auth";
+import { LEAD_STATUSES, SERVICES } from "@/lib/config";
 
 export async function GET(request, { params }) {
   const { response } = verifyAuth(request);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/api/db";
-import WebsiteModule from "@/api/models/Website";
-import { verifyAuth } from "@/api/middleware/auth";
+import { connectDB } from "@/lib/db";
+import WebsiteModule from "@/lib/models/Website";
+import { verifyAuth } from "@/lib/auth";
 
 const Service = WebsiteModule.Service;
 

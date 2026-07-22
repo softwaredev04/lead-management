@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/api/db";
-import Website from "@/api/models/Website";
-import { verifyAuth } from "@/api/middleware/auth";
+import { connectDB } from "@/lib/db";
+import Website from "@/lib/models/Website";
+import { verifyAuth } from "@/lib/auth";
 
 export async function GET(request) {
   const { response } = verifyAuth(request);
