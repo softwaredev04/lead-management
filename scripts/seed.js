@@ -1,4 +1,4 @@
-require("dotenv").config({ path: require("path").resolve(__dirname, "../.env.local") });
+require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 if (!process.env.MONGODB_URI) {
   require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") });
 }
