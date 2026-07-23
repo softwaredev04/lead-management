@@ -1,7 +1,9 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+
 <!-- END:nextjs-agent-rules -->
 
 # ClickMasters Central Lead Management System
@@ -13,6 +15,7 @@ A centralized Lead Management System (LMS) for all ClickMasters websites. Every 
 This is an **internal tool**, NOT a public CRM.
 
 ### Priorities
+
 - Simplicity
 - Clean architecture
 - Fast performance
@@ -26,17 +29,17 @@ Instead of checking multiple websites and multiple emails, every lead should app
 
 ## ClickMasters Websites (All Connected Domains)
 
-| # | Domain |
-|---|--------|
-| 1 | clickmastersdigitalmarketing.com |
-| 2 | clickmasterssoftwaredevelopmentcompany.com |
-| 3 | clickmastersmobiledevelopmentcompany.com |
-| 4 | clickmastersblockchaintechnologies.com |
-| 5 | clickmasterswebdevelopmentcompany.com |
-| 6 | clickmastersartificialintelligencecompany.com |
-| 7 | clickmastersapplicationdevelopment.com |
-| 8 | clickmastersaiautomation.com |
-| 9 | clickmasterssoftwaredevelopmentcompany.co.uk |
+| #  | Domain                                          |
+| -- | ----------------------------------------------- |
+| 1  | clickmastersdigitalmarketing.com                |
+| 2  | clickmasterssoftwaredevelopmentcompany.com      |
+| 3  | clickmastersmobiledevelopmentcompany.com        |
+| 4  | clickmastersblockchaintechnologies.com          |
+| 5  | clickmasterswebdevelopmentcompany.com           |
+| 6  | clickmastersartificialintelligencecompany.com   |
+| 7  | clickmastersapplicationdevelopment.com          |
+| 8  | clickmastersaiautomation.com                    |
+| 9  | clickmasterssoftwaredevelopmentcompany.co.uk    |
 | 10 | clickmastersartificialintelligencecompany.co.uk |
 
 ---
@@ -45,15 +48,15 @@ Instead of checking multiple websites and multiple emails, every lead should app
 
 ## Current Stack (Implemented)
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js (App Router) |
-| Backend | Next.js API Routes |
-| Database | MongoDB + Mongoose |
-| Auth | JWT (single admin login) |
-| Styling | Tailwind CSS + shadcn/ui |
-| Validation | Zod |
-| Deployment | Ubuntu, PM2, Nginx |
+| Layer      | Technology               |
+| ---------- | ------------------------ |
+| Frontend   | Next.js (App Router)     |
+| Backend    | Next.js API Routes       |
+| Database   | MongoDB + Mongoose       |
+| Auth       | JWT (single admin login) |
+| Styling    | Tailwind CSS + shadcn/ui |
+| Validation | Zod                      |
+| Deployment | Ubuntu, PM2, Nginx       |
 
 ## Project Structure
 
@@ -117,38 +120,44 @@ lead-management/
 # Main Pages
 
 ## Login
+
 Simple login page with email + password → JWT token stored in localStorage.
 
 ## Dashboard
+
 - Total Leads, Today's Leads, This Month count
 - Status cards: New, Contacted, Closed, Spam
 - Charts: Daily Leads, Website-wise Leads, Service-wise Leads, Monthly Leads
 - Recent Leads table
 
 ## Leads Page
+
 Table columns: Name, Phone, Email, Website, Service, Source, Status, Created Date, Actions.
 Features: Search (name/phone/email/company/message), Pagination, Sorting, Filters (Website, Status, Service, Date).
 
 ## Lead Details Page
+
 Displays: Name, Email, Phone, Company, Message, Website, Landing Page, Service, Status, Notes, Created/Updated Date, Referrer, UTM fields (source/medium/campaign/term/content), IP Address, Country, City, Browser, OS, Device Type.
 Editable fields only: Status, Notes, Service. Original lead data remains unchanged.
 
 ## Services Page
+
 Manage available services (CRUD).
 
 ## Websites Page
+
 Manage connected websites (CRUD).
 
 ---
 
 # Lead Statuses
 
-| Status | Meaning |
-|--------|---------|
-| 🟢 New | Fresh lead, not contacted yet |
-| 🟡 Contacted | Reached out to |
-| 🔵 Closed | Deal won/lost |
-| 🔴 Spam | Marked as spam |
+| Status       | Meaning                       |
+| ------------ | ----------------------------- |
+| 🟢 New       | Fresh lead, not contacted yet |
+| 🟡 Contacted | Reached out to                |
+| 🔵 Closed    | Deal won/lost                 |
+| 🔴 Spam      | Marked as spam                |
 
 ---
 
@@ -167,25 +176,27 @@ Manage connected websites (CRUD).
 # API Endpoints
 
 ## Public (No Auth Required)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/leads` | Create a new lead (from external websites) |
-| OPTIONS | `/api/leads` | CORS preflight for external domains |
+
+| Method  | Endpoint       | Description                                |
+| ------- | -------------- | ------------------------------------------ |
+| POST    | `/api/leads` | Create a new lead (from external websites) |
+| OPTIONS | `/api/leads` | CORS preflight for external domains        |
 
 ## Protected (Auth Required)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/leads` | List leads (paginated, filterable, searchable) |
-| GET | `/api/leads/stats` | Dashboard statistics |
-| GET | `/api/leads/charts` | Chart data |
-| GET | `/api/leads/:id` | Get single lead |
-| PUT | `/api/leads/:id` | Update lead (status, notes, service only) |
-| DELETE | `/api/leads/:id` | Delete a lead |
-| GET | `/api/websites` | List websites |
-| POST | `/api/websites` | Create website |
-| GET | `/api/services` | List services |
-| POST | `/api/services` | Create service |
-| POST | `/api/auth/login` | Admin login |
+
+| Method | Endpoint              | Description                                    |
+| ------ | --------------------- | ---------------------------------------------- |
+| GET    | `/api/leads`        | List leads (paginated, filterable, searchable) |
+| GET    | `/api/leads/stats`  | Dashboard statistics                           |
+| GET    | `/api/leads/charts` | Chart data                                     |
+| GET    | `/api/leads/:id`    | Get single lead                                |
+| PUT    | `/api/leads/:id`    | Update lead (status, notes, service only)      |
+| DELETE | `/api/leads/:id`    | Delete a lead                                  |
+| GET    | `/api/websites`     | List websites                                  |
+| POST   | `/api/websites`     | Create website                                 |
+| GET    | `/api/services`     | List services                                  |
+| POST   | `/api/services`     | Create service                                 |
+| POST   | `/api/auth/login`   | Admin login                                    |
 
 ## Lead POST Payload (External Form Submission)
 
@@ -209,7 +220,9 @@ Manage connected websites (CRUD).
 ```
 
 ## Automatically Captured Fields
+
 On every lead submission, the backend captures:
+
 - Submission Timestamp (createdAt)
 - IP Address
 - Country & City (via geo lookup)
@@ -223,6 +236,7 @@ On every lead submission, the backend captures:
 # Email Notifications (SMTP)
 
 When a new lead arrives:
+
 1. **Auto-reply to visitor** — Branded thank-you email confirming receipt.
 2. **Team notification** — Alert emailed to `software.clickmasters@gmail.com` with lead details.
 
@@ -233,6 +247,7 @@ Both emails use beautiful HTML templates matching the ClickMasters brand.
 # CORS & External Access
 
 CORS is fully enabled for all domains:
+
 ```
 Access-Control-Allow-Origin: *
 Access-Control-Allow-Methods: GET, POST, OPTIONS
@@ -245,14 +260,15 @@ External websites can POST leads without any authentication token.
 
 # Database Collections
 
-| Collection | Purpose |
-|------------|---------|
-| `users` | Single admin account |
-| `leads` | All lead submissions from all domains |
-| `websites` | Registered ClickMasters websites |
-| `services` | Available service categories |
+| Collection   | Purpose                               |
+| ------------ | ------------------------------------- |
+| `users`    | Single admin account                  |
+| `leads`    | All lead submissions from all domains |
+| `websites` | Registered ClickMasters websites      |
+| `services` | Available service categories          |
 
 ## Lead Schema (Mongoose)
+
 ```
 {
   name: String (required),
@@ -310,16 +326,19 @@ External websites can POST leads without any authentication token.
 The following features are documented in the system requirements but **not yet implemented** — the architecture supports adding them without major refactoring.
 
 ## Multi-Event Tracking
+
 - WhatsApp button clicks
 - Phone call clicks (click-to-call)
 - Tracked as separate interaction types alongside form submissions
 
 ## Duplicate Prevention (Unique Visitor Logic)
+
 - Unique visitor ID via cookie/localStorage + fingerprinting
 - Configurable time window (24 hours / session)
 - Each interaction type deduplicated independently
 
 ## Visitor Behavior & Journey Tracking
+
 - Page-level tracking with timestamps
 - Time-on-page calculation
 - Visitor journey flow (entry → path → exit)
@@ -327,6 +346,7 @@ The following features are documented in the system requirements but **not yet i
 - Session grouping
 
 ## Embedded AI Assistant
+
 - Natural-language query interface in the dashboard
 - Connects directly to live database (read access)
 - Example queries: "Show me today's conversion rate", "How many leads this month?"
@@ -334,19 +354,21 @@ The following features are documented in the system requirements but **not yet i
 - Proactive insight flagging (traffic spikes, conversion drops)
 
 ## Multi-Domain Management (Enhanced)
+
 - Independent tracking data per domain
 - Unified overview + per-domain drill-down
 - Cross-domain comparison queries via AI assistant
 
 ## Suggested Schema (Future Features)
-| Table | Purpose |
-|-------|---------|
-| `domains` | Each tracked website/domain |
-| `visitors` | Unique visitor identity + returning status |
-| `sessions` | Group page views into visits |
-| `page_views` | Pages visited + duration |
-| `leads` | Expanded: form/whatsapp/call types |
-| `ai_query_log` | AI assistant interaction audit log |
+
+| Table            | Purpose                                    |
+| ---------------- | ------------------------------------------ |
+| `domains`      | Each tracked website/domain                |
+| `visitors`     | Unique visitor identity + returning status |
+| `sessions`     | Group page views into visits               |
+| `page_views`   | Pages visited + duration                   |
+| `leads`        | Expanded: form/whatsapp/call types         |
+| `ai_query_log` | AI assistant interaction audit log         |
 
 ---
 
@@ -366,13 +388,13 @@ The following features are documented in the system requirements but **not yet i
 
 # Deployment
 
-| Component | Technology |
-|-----------|-----------|
-| Server | Ubuntu VPS |
-| Process Manager | PM2 |
-| Reverse Proxy | Nginx |
-| Domain | crm.clickmasters.pk |
-| Database | MongoDB (local or Atlas) |
+| Component       | Technology               |
+| --------------- | ------------------------ |
+| Server          | Ubuntu VPS               |
+| Process Manager | PM2                      |
+| Reverse Proxy   | Nginx                    |
+| Domain          | crm.clickmasters.pk      |
+| Database        | MongoDB (local or Atlas) |
 
 Skip Docker, Kubernetes, Redis, RabbitMQ, complex CI/CD — added only when/if needed.
 
