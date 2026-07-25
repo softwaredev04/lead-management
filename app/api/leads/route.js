@@ -54,6 +54,19 @@ export async function GET(request) {
     const sortField = searchParams.get("sort") || "createdAt";
     const sortDir = searchParams.get("order") === "asc" ? 1 : -1;
 
+    // Date range filter
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+    if (startDate || endDate) {
+      const dateFilter = {};
+      if (startDate) dateFilter.$gte = new Date(startDate);
+      if (endDate) dateFilter.$lte = new Date(endDate + "T23:59:59.999Z");
+      filter.createdAt = dateFilter;
+    }
+
+    // Assignee filter
+    if (searchParams.get("assignee")) filter.assignee = searchParams.get("assignee");
+
     const search = searchParams.get("search");
     let query = Lead.find(filter);
     if (search) {

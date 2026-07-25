@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -11,52 +12,62 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Users,
+  Calendar,
+  TrendingUp,
+  MessageSquare,
+  PhoneCall,
+  CheckCircle,
+} from "lucide-react";
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
-function StatCard({ label, value, tone }) {
-  const tones = {
-    default: "text-foreground",
-    new: "text-blue-600",
-    contacted: "text-amber-600",
-    closed: "text-emerald-600",
-    spam: "text-red-600",
+function StatCard({ label, value, icon: Icon, trend, color }) {
+  const colors = {
+    default: "from-primary/10 to-primary/5 border-primary/20",
+    new: "from-blue-500/10 to-blue-500/5 border-blue-500/20",
+    contacted: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
+    closed: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
+    spam: "from-red-500/10 to-red-500/5 border-red-500/20",
   };
   return (
-    <Card>
-      <CardContent className="pt-5">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={`mt-2 text-3xl font-semibold ${tones[tone] || tones.default}`}>{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function BarChart({ title, data, labelKey }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No data yet.</p>
-        ) : (
-          <div className="space-y-2.5">
-            {data.map((d) => (
-              <div key={d[labelKey]} className="flex items-center gap-3 text-sm">
-                <span className="w-40 shrink-0 truncate text-muted-foreground" title={d[labelKey]}>
-                  {d[labelKey]}
-                </span>
-                <div className="h-5 flex-1 overflow-hidden rounded bg-muted">
-                  <div
-                    className="h-full rounded bg-primary transition-all"
-                    style={{ width: `${(d.count / max) * 100}%` }}
-                  />
-                </div>
-                <span className="w-8 text-right font-medium">{d.count}</span>
-              </div>
-            ))}
+    <Card className="animate-fade-in overflow-hidden border-0 bg-gradient-to-br shadow-md ring-1 ring-foreground/5">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {label}
+            </p>
+            <p className="text-3xl font-bold tracking-tight text-foreground">
+              {value ?? "—"}
+            </p>
+          </div>
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${colors[color] || colors.default} border`}
+          >
+            <Icon className="size-5 text-foreground/70" />
+          </div>
+        </div>
+        {trend !== undefined && (
+          <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+            <TrendingUp className="size-3 text-emerald-500" />
+            <span>{trend} from last month</span>
           </div>
         )}
       </CardContent>
@@ -64,46 +75,26 @@ function BarChart({ title, data, labelKey }) {
   );
 }
 
-function DailyChart({ data }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
-  const days = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (29 - i));
-    return d.toISOString().slice(0, 10);
-  });
-  const map = Object.fromEntries(data.map((x) => [x.date, x.count]));
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Daily Leads</CardTitle>
-        <p className="text-xs text-muted-foreground">Last 30 days</p>
-      </CardHeader>
-      <CardContent>
-        {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No data yet.</p>
-        ) : (
-          <div className="flex h-36 items-end gap-1">
-            {days.map((day) => (
-              <div
-                key={day}
-                title={`${day}: ${map[day] || 0}`}
-                className="flex-1 rounded-t bg-primary/70 transition-all hover:bg-primary"
-                style={{ height: `${((map[day] || 0) / max) * 100}%` }}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+function CustomTooltip({ active, payload, label }) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-lg">
+        <p className="font-medium text-foreground">{label}</p>
+        {payload.map((entry, i) => (
+          <p key={i} className="text-muted-foreground">
+            {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
 }
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
   const [charts, setCharts] = useState(null);
-  const [error, setError] = useState("");
-
   useEffect(() => {
     async function load() {
       try {
@@ -116,87 +107,225 @@ export default function DashboardPage() {
         setRecent(leads.data || []);
         setCharts(c);
       } catch (err) {
-        setError(err.message);
+        toast.error(err.message);
       }
     }
     load();
   }, []);
 
-  if (error)
-    return (
-      <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-        {error}
-      </div>
-    );
-
   const loading = !stats && !charts;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Overview of all leads across ClickMasters websites.</p>
+      {/* Header */}
+      <div className="animate-fade-in">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          Dashboard
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Overview of all leads across ClickMasters websites.
+        </p>
       </div>
 
+      {/* Stat Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-4xl" />
-          ))
-        ) : (
-          <>
-            <StatCard label="Total Leads" value={stats?.total ?? 0} />
-            <StatCard label="Today" value={stats?.today ?? 0} />
-            <StatCard label="This Month" value={stats?.thisMonth ?? 0} />
-            <StatCard label="New" value={stats?.new ?? 0} tone="new" />
-            <StatCard label="Contacted" value={stats?.contacted ?? 0} tone="contacted" />
-            <StatCard label="Closed" value={stats?.closed ?? 0} tone="closed" />
-          </>
-        )}
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-[116px] rounded-xl" />
+            ))
+          : [
+              { label: "Total Leads", value: stats?.total ?? 0, icon: Users },
+              { label: "Today", value: stats?.today ?? 0, icon: Calendar },
+              { label: "This Month", value: stats?.thisMonth ?? 0, icon: TrendingUp },
+              { label: "New", value: stats?.new ?? 0, icon: MessageSquare, color: "new" },
+              { label: "Contacted", value: stats?.contacted ?? 0, icon: PhoneCall, color: "contacted" },
+              { label: "Closed", value: stats?.closed ?? 0, icon: CheckCircle, color: "closed" },
+            ].map((card, i) => (
+              <div key={card.label} style={{ animationDelay: `${(i + 1) * 0.05}s` }}>
+                <StatCard {...card} />
+              </div>
+            ))}
       </div>
 
+      {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* Daily Leads - Area Chart */}
         <div className="lg:col-span-2">
-          {charts ? <DailyChart data={charts.daily || []} /> : <Skeleton className="h-72 rounded-4xl" />}
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle>Daily Leads</CardTitle>
+              <p className="text-xs text-muted-foreground">Last 30 days</p>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-56 w-full rounded-lg" />
+              ) : !charts?.daily?.length ? (
+                <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+                  No data yet.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <AreaChart data={charts.daily} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => {
+                        const d = new Date(v);
+                        return `${d.getDate()}/${d.getMonth() + 1}`;
+                      }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area
+                      type="monotone"
+                      dataKey="count"
+                      stroke="var(--primary)"
+                      strokeWidth={2}
+                      fill="url(#colorCount)"
+                      name="Leads"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
         </div>
-        {charts ? (
-          <>
-            <BarChart title="By Website" data={charts.byWebsite || []} labelKey="website" />
-            <BarChart title="By Service" data={charts.byService || []} labelKey="service" />
-          </>
-        ) : (
-          <>
-            <Skeleton className="h-72 rounded-4xl" />
-            <Skeleton className="h-72 rounded-4xl" />
-          </>
-        )}
+
+        {/* By Website */}
+        <Card className="animate-fade-in">
+          <CardHeader>
+            <CardTitle>By Website</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-56 w-full rounded-lg" />
+            ) : !charts?.byWebsite?.length ? (
+              <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+                No data yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={charts.byWebsite} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    dataKey="website"
+                    type="category"
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={90}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--primary)"
+                    radius={[0, 4, 4, 0]}
+                    name="Leads"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* By Service */}
+        <Card className="animate-fade-in lg:col-span-2">
+          <CardHeader>
+            <CardTitle>By Service</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-56 w-full rounded-lg" />
+            ) : !charts?.byService?.length ? (
+              <div className="flex h-56 items-center justify-center text-sm text-muted-foreground">
+                No data yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={charts.byService} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis
+                    dataKey="service"
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--chart-3)"
+                    radius={[4, 4, 0, 0]}
+                    name="Leads"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <Card>
+      {/* Recent Leads Table */}
+      <Card className="animate-fade-in">
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Recent Leads</CardTitle>
-          <Link href="/leads" className="text-sm text-primary hover:underline">
-            View all
+          <div>
+            <CardTitle>Recent Leads</CardTitle>
+            <p className="text-xs text-muted-foreground">Latest 5 submissions</p>
+          </div>
+          <Link
+            href="/leads"
+            className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
+          >
+            View all →
           </Link>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="space-y-2 p-5">
+            <div className="space-y-3 p-5">
               {Array.from({ length: 4 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
               ))}
             </div>
           ) : recent.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-muted-foreground">No leads yet.</p>
+            <div className="flex flex-col items-center gap-2 px-5 py-10 text-sm text-muted-foreground">
+              <Users className="size-8 text-muted-foreground/40" />
+              <p>No leads yet. Leads from your websites will appear here.</p>
+            </div>
           ) : (
             <Table>
               <TableBody>
                 {recent.map((lead) => (
-                  <TableRow key={lead._id} className="border-border">
+                  <TableRow key={lead._id} className="border-border transition-colors hover:bg-muted/30">
                     <TableCell>
                       <Link href={`/leads/${lead._id}`} className="block">
-                        <p className="font-medium">{lead.name}</p>
-                        <p className="text-muted-foreground">{lead.email}</p>
+                        <p className="font-medium text-foreground">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground">{lead.email}</p>
                       </Link>
                     </TableCell>
                     <TableCell className="text-right">

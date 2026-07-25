@@ -27,6 +27,7 @@ const editSchema = z.object({
   status: z.enum(LEAD_STATUSES).optional(),
   service: z.enum(SERVICES).optional(),
   notes: z.array(z.object({ text: z.string().min(1) })).optional(),
+  assignee: z.string().optional(),
 });
 
 export async function PUT(request, { params }) {
@@ -47,9 +48,10 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    const { status, service, notes } = parsed.data;
+    const { status, service, notes, assignee } = parsed.data;
     if (status !== undefined) existing.status = status;
     if (service !== undefined) existing.service = service;
+    if (assignee !== undefined) existing.assignee = assignee;
     if (notes !== undefined) {
       existing.notes = notes.map((n) => ({
         text: n.text,

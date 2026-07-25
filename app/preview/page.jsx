@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const WEBSITES = [
   "clickmastersdigitalmarketing.com",
@@ -26,7 +29,6 @@ const SERVICES = [
   "Automation",
 ];
 
-// Field → where it appears in each email template
 const MAPPING = [
   { field: "name", visitor: "Shown (greeting + copy)", team: "Shown" },
   { field: "email", visitor: "Sent TO (auto-reply)", team: "Shown" },
@@ -46,9 +48,6 @@ const MAPPING = [
   { field: "ipAddress", visitor: "—", team: "Shown" },
   { field: "country", visitor: "—", team: "Shown" },
 ];
-
-const inputCls =
-  "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30";
 
 export default function PreviewPage() {
   const [form, setForm] = useState({
@@ -90,126 +89,159 @@ export default function PreviewPage() {
     }
   }
 
+  const fieldCls = "space-y-1.5";
+  const inputCls =
+    "h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
+
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-6">
+    <div className="mx-auto max-w-5xl space-y-8 p-6 animate-fade-in">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Contact Form Preview</h1>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          Contact Form Preview
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          This mirrors what a ClickMasters website sends to <code>POST /api/leads</code>. Submitting
-          creates a real lead and triggers both emails.
+          This mirrors what a ClickMasters website sends to{" "}
+          <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">
+            POST /api/leads
+          </code>
+          . Submitting creates a real lead and triggers both emails.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border bg-card p-5">
-          <h2 className="text-base font-medium">Form fields</h2>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Name</label>
+        <form onSubmit={handleSubmit} className="space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-base font-semibold text-foreground">Form fields</h2>
+
+          <div className={fieldCls}>
+            <Label>Name</Label>
             <input className={inputCls} value={form.name} onChange={(e) => set("name", e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Email</label>
+
+          <div className={fieldCls}>
+            <Label>Email</Label>
             <input type="email" className={inputCls} value={form.email} onChange={(e) => set("email", e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Phone</label>
+
+          <div className={fieldCls}>
+            <Label>Phone</Label>
             <input className={inputCls} value={form.phone} onChange={(e) => set("phone", e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Company</label>
+
+          <div className={fieldCls}>
+            <Label>Company</Label>
             <input className={inputCls} value={form.company} onChange={(e) => set("company", e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Website</label>
-            <select className={inputCls} value={form.website} onChange={(e) => set("website", e.target.value)}>
-              {WEBSITES.map((w) => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className={fieldCls}>
+              <Label>Website</Label>
+              <select className={inputCls} value={form.website} onChange={(e) => set("website", e.target.value)}>
+                {WEBSITES.map((w) => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </div>
+            <div className={fieldCls}>
+              <Label>Service</Label>
+              <select className={inputCls} value={form.service} onChange={(e) => set("service", e.target.value)}>
+                {SERVICES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Service</label>
-            <select className={inputCls} value={form.service} onChange={(e) => set("service", e.target.value)}>
-              {SERVICES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+
+          <div className={fieldCls}>
+            <Label>Message</Label>
+            <textarea
+              rows={3}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+              value={form.message}
+              onChange={(e) => set("message", e.target.value)}
+            />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Message</label>
-            <textarea rows={3} className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none" value={form.message} onChange={(e) => set("message", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Landing Page</label>
+
+          <div className={fieldCls}>
+            <Label>Landing Page</Label>
             <input className={inputCls} value={form.landingPage} onChange={(e) => set("landingPage", e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Referrer</label>
+
+          <div className={fieldCls}>
+            <Label>Referrer</Label>
             <input className={inputCls} value={form.referrer} onChange={(e) => set("referrer", e.target.value)} />
           </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">utm_source</label>
+            <div className={fieldCls}>
+              <Label>utm_source</Label>
               <input className={inputCls} value={form.utm_source} onChange={(e) => set("utm_source", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">utm_medium</label>
+            <div className={fieldCls}>
+              <Label>utm_medium</Label>
               <input className={inputCls} value={form.utm_medium} onChange={(e) => set("utm_medium", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">utm_campaign</label>
+            <div className={fieldCls}>
+              <Label>utm_campaign</Label>
               <input className={inputCls} value={form.utm_campaign} onChange={(e) => set("utm_campaign", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">utm_term</label>
+            <div className={fieldCls}>
+              <Label>utm_term</Label>
               <input className={inputCls} value={form.utm_term} onChange={(e) => set("utm_term", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">utm_content</label>
+            <div className={fieldCls}>
+              <Label>utm_content</Label>
               <input className={inputCls} value={form.utm_content} onChange={(e) => set("utm_content", e.target.value)} />
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="h-10 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/80 disabled:opacity-50"
-          >
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Submitting…" : "Submit Lead (live)"}
-          </button>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          </Button>
+
+          {error && (
+            <p className="animate-fade-in rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
           {result && (
-            <p className="text-sm text-emerald-600">
-              Lead created ({result._id}). Both emails triggered.
+            <p className="animate-fade-in rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
+              Lead created ({result._id.slice(0, 8)}...). Both emails triggered.
             </p>
           )}
         </form>
 
-        {/* Mapping */}
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="mb-4 text-base font-medium">Field → Email mapping</h2>
+        {/* Mapping table */}
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="mb-4 text-base font-semibold text-foreground">
+            Field → Email mapping
+          </h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
-                  <th className="py-2 pr-3 font-medium">Field</th>
-                  <th className="py-2 pr-3 font-medium">Visitor email</th>
+                  <th className="py-2 pr-4 font-medium">Field</th>
+                  <th className="py-2 pr-4 font-medium">Visitor email</th>
                   <th className="py-2 font-medium">Team email</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {MAPPING.map((m) => (
                   <tr key={m.field}>
-                    <td className="py-2 pr-3 font-mono text-xs">{m.field}</td>
-                    <td className="py-2 pr-3">{m.visitor}</td>
-                    <td className="py-2">{m.team}</td>
+                    <td className="py-2.5 pr-4 font-mono text-xs text-foreground">
+                      {m.field}
+                    </td>
+                    <td className="py-2.5 pr-4 text-muted-foreground">
+                      {m.visitor}
+                    </td>
+                    <td className="py-2.5 text-muted-foreground">{m.team}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             Branding (header/footer) comes from the <strong>Website</strong> matching the submitted
             domain. Auto-captured fields (IP, country, browser, OS, device) are added by the server
             and appear in the team email.
