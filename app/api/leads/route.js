@@ -33,6 +33,7 @@ const createSchema = z.object({
   utm_campaign: z.string().optional(),
   utm_term: z.string().optional(),
   utm_content: z.string().optional(),
+  isTest: z.boolean().optional(),
 });
 
 export async function GET(request) {
@@ -104,6 +105,7 @@ export async function POST(request) {
 
     const lead = await Lead.create({
       ...data,
+      isTest: data.isTest === true,
       utm: {
         source: data.utm_source,
         medium: data.utm_medium,
@@ -118,7 +120,8 @@ export async function POST(request) {
       deviceType: device.deviceType,
     });
 
-    notifyNewLead(lead);
+    // Skip email notifications for automated test leads (connection checks)
+    if (!lead.isTest) notifyNewLead(lead);
     return NextResponse.json(lead, { status: 201, headers: corsHeaders });
   } catch (error) {
     console.error("Lead create error:", error);
