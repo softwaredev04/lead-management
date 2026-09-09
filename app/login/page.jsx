@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, setToken } from "@/lib/api";
+import { api, setToken, setUser } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,8 +19,9 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { token } = await api.login(email, password);
+      const { token, user } = await api.login(email, password);
       setToken(token);
+      setUser(user);
       router.push("/dashboard");
     } catch (err) {
       toast.error(err.message || "Login failed");

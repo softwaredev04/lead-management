@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   Users,
+  UserCog,
   Globe,
   Layers,
   Mail,
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/websites", label: "Websites", icon: Globe },
   { href: "/services", label: "Services", icon: Layers },
+  { href: "/users", label: "Users", icon: UserCog },
   { href: "/preview", label: "Email Preview", icon: Mail },
 ];
 

@@ -651,7 +651,14 @@ export default function LeadsPage() {
                             <p className="text-xs text-muted-foreground">{lead.website}</p>
                           </div>
                         ) : col.key === "status" ? (
-                          <StatusBadge status={lead.status} />
+                          <div className="flex items-center gap-1.5">
+                            <StatusBadge status={lead.status} />
+                            {lead.isTest && (
+                              <span className="inline-flex items-center rounded-full border border-dashed border-amber-500/50 bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                                Test
+                              </span>
+                            )}
+                          </div>
                         ) : col.key === "assignee" ? (
                           <span className={lead.assignee ? "text-foreground" : "text-muted-foreground/40 italic"}>
                             {lead.assignee || "Unassigned"}
