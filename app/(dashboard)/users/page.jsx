@@ -28,7 +28,11 @@ import {
   KeyRound,
   AlertTriangle,
   CircleCheck,
+  Briefcase,
+  Target,
+  Users,
 } from "lucide-react";
+import { roleLabel } from "@/lib/config";
 import { formatRelativeTime } from "@/lib/utils";
 
 const inputCls =
@@ -40,6 +44,29 @@ const EMPTY_FORM = {
   password: "",
   role: "viewer",
   isActive: true,
+};
+
+const ROLE_STYLES = {
+  admin: {
+    icon: ShieldCheck,
+    cls: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400",
+  },
+  manager: {
+    icon: Briefcase,
+    cls: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400",
+  },
+  team_lead: {
+    icon: Users,
+    cls: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400",
+  },
+  sales_agent: {
+    icon: Target,
+    cls: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400",
+  },
+  viewer: {
+    icon: Eye,
+    cls: "bg-muted text-muted-foreground",
+  },
 };
 
 export default function UsersPage() {
@@ -259,17 +286,14 @@ export default function UsersPage() {
                     <TableCell>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
-                          u.role === "admin"
-                            ? "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400"
-                            : "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400"
+                          (ROLE_STYLES[u.role] || ROLE_STYLES.viewer).cls
                         }`}
                       >
-                        {u.role === "admin" ? (
-                          <ShieldCheck className="size-3" />
-                        ) : (
-                          <Eye className="size-3" />
-                        )}
-                        {u.role === "admin" ? "Admin" : "Viewer"}
+                        {(() => {
+                          const RoleIcon = (ROLE_STYLES[u.role] || ROLE_STYLES.viewer).icon;
+                          return <RoleIcon className="size-3" />;
+                        })()}
+                        {roleLabel(u.role)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -420,8 +444,11 @@ export default function UsersPage() {
                         onChange={(e) => setForm({ ...form, role: e.target.value })}
                         className={`${inputCls} w-full`}
                       >
-                        <option value="viewer">Viewer</option>
-                        <option value="admin">Admin</option>
+                        <option value="sales_agent">Sales Agent</option>
+                        <option value="team_lead">Team Lead</option>
+                        <option value="manager">Manager</option>
+                        <option value="viewer">Viewer (read-only)</option>
+                        <option value="admin">Admin (full access)</option>
                       </select>
                     </div>
                     <div className="space-y-1.5">
@@ -564,7 +591,7 @@ export default function UsersPage() {
                 <div className="mt-4 space-y-2 text-sm">
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Role</span>
-                    <span className="font-medium capitalize text-foreground">{viewTarget.role}</span>
+                    <span className="font-medium text-foreground">{roleLabel(viewTarget.role)}</span>
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Status</span>

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import Website from "@/lib/models/Website";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireRole } from "@/lib/auth";
+import { WRITE_ROLES } from "@/lib/config";
 import { normalizeDomain } from "@/lib/config";
 
 const corsHeaders = {
@@ -32,7 +33,7 @@ const createWebsiteSchema = z.object({
 });
 
 export async function POST(request) {
-  const { response } = verifyAuth(request);
+  const { response } = requireRole(request, WRITE_ROLES);
   if (response) return response;
 
   try {

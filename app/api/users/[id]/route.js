@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import User from "@/lib/models/User";
 import { requireAdmin } from "@/lib/auth";
+import { USER_ROLES } from "@/lib/config";
 
 const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
@@ -10,7 +12,7 @@ const updateSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(80).optional(),
   email: z.string().trim().email("A valid email is required").toLowerCase().optional(),
   password: z.string().min(6, "Password must be at least 6 characters").max(100).optional(),
-  role: z.enum(["admin", "viewer"]).optional(),
+  role: z.enum(USER_ROLES).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -82,8 +84,8 @@ export async function PUT(request, { params }) {
       }
     }
 
-    // Self-guard: never lock yourself out
-    if (isSelf && (data.isActive === false || data.role === "viewer")) {
+    // Self-guard: never lock yourself out (any non-admin role is a demotion)
+    if (isSelf && (data.isActive === false || (data.role !== undefined && data.role !== "admin"))) {
       return NextResponse.json(
         { error: "You cannot deactivate or demote your own account" },
         { status: 400 }
@@ -115,6 +117,13 @@ export async function PUT(request, { params }) {
     delete obj.passwordHash;
     return NextResponse.json(obj);
   } catch (error) {
+    if (error instanceof mongoose.Error.ValidationError) {
+      const first = Object.values(error.errors)[0];
+      return NextResponse.json({ error: first?.message || "Validation failed" }, { status: 400 });
+    }
+    if (error?.code === 11000) {
+      return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
+    }
     console.error("User update error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

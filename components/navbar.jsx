@@ -2,12 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
+import { getCurrentUser } from "@/lib/api";
+import { roleLabel as formatRole } from "@/lib/config";
 
 const TITLES = {
   "/dashboard": "Dashboard",
   "/leads": "Leads",
   "/websites": "Websites",
   "/services": "Services",
+  "/users": "Users",
   "/preview": "Email Preview",
 };
 
@@ -34,6 +37,10 @@ function breadcrumbsFor(pathname) {
 export function Navbar() {
   const pathname = usePathname();
   const breadcrumbs = breadcrumbsFor(pathname);
+  const user = getCurrentUser();
+  const displayName = user?.name || user?.email?.split("@")[0] || "Admin";
+  const initial = displayName.charAt(0).toUpperCase();
+  const roleLabel = formatRole(user?.role);
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
@@ -45,9 +52,14 @@ export function Navbar() {
       </div>
       <div className="flex items-center gap-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-          A
+          {initial}
         </div>
-        <span className="text-sm text-muted-foreground">Admin</span>
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm text-foreground">{displayName}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {roleLabel}
+          </span>
+        </div>
       </div>
     </header>
   );
