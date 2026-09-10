@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatRelativeTime, formatFullDate } from "@/lib/utils";
+import { roleLabel } from "@/lib/config";
 import {
   ArrowLeft,
   Save,
@@ -28,6 +29,7 @@ import {
   Send,
   Inbox,
   UserRound,
+  History,
 } from "lucide-react";
 
 const STATUSES = ["New", "Contacted", "Closed", "Spam"];
@@ -74,21 +76,24 @@ export default function LeadDetailsPage() {
   const [service, setService] = useState("");
   const [assignee, setAssignee] = useState("");
   const [notes, setNotes] = useState("");
+  const [users, setUsers] = useState([]); // team members for the assignee dropdown
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
-        const [data, svc, sites] = await Promise.all([
+        const [data, svc, sites, teamRes] = await Promise.all([
           api.getLead(id),
           api.getServices(),
           api.getWebsites(),
+          api.getUsers().catch(() => ({ users: [] })),
         ]);
         setLead(data);
         setStatus(data.status);
         setService(data.service || "");
-        setAssignee(data.assignee || "");
+        setAssignee(data.assigneeId || "");
         setServices(svc.map((x) => x.name));
+        setUsers((teamRes.users || []).filter((u) => u.isActive !== false));
         const site = sites.find((w) => w.domain === data.website);
         setWebsiteName(site ? site.name : "");
       } catch (err) {
@@ -102,7 +107,12 @@ export default function LeadDetailsPage() {
     setSaving(true);
     try {
       const notesArray = notes.trim() ? [{ text: notes.trim() }] : lead.notes || [];
-      const updated = await api.updateLead(id, { status, service, assignee, notes: notesArray });
+      const updated = await api.updateLead(id, {
+        status,
+        service,
+        assigneeId: assignee || null,
+        notes: notesArray,
+      });
       setLead(updated);
       setNotes("");
       toast.success("Changes saved successfully.");
@@ -279,14 +289,20 @@ export default function LeadDetailsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="assignee">Assignee</Label>
-                <input
+                <Label htmlFor="assignee">Assigned To</Label>
+                <select
                   id="assignee"
                   value={assignee}
                   onChange={(e) => setAssignee(e.target.value)}
-                  placeholder="Person responsible…"
-                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-                />
+                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                >
+                  <option value="">Unassigned</option>
+                  {users.map((u) => (
+                    <option key={u._id} value={u._id}>
+                      {u.name} ({roleLabel(u.role)})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">
@@ -365,6 +381,49 @@ export default function LeadDetailsPage() {
                         <p className="text-sm text-foreground">{n.text}</p>
                         <p className="mt-1 text-xs text-muted-foreground" title={formatFullDate(n.createdAt)}>
                           {formatRelativeTime(n.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Activity Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Activity Timeline</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!lead.activities || lead.activities.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <History className="size-6 text-muted-foreground/40" />
+                  <p>No activity recorded yet.</p>
+                </div>
+              ) : (
+                <div className="relative space-y-4">
+                  <div className="absolute left-[7px] top-2 h-[calc(100%-16px)] w-px bg-border" />
+                  {[...lead.activities].reverse().map((a, i) => (
+                    <div key={i} className="relative flex gap-3">
+                      <div className="relative z-10 mt-1.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                        <div
+                          className={
+                            a.type === "created"
+                              ? "h-2.5 w-2.5 rounded-full border-2 border-primary bg-primary"
+                              : "h-2.5 w-2.5 rounded-full border-2 border-primary bg-background"
+                          }
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-lg bg-muted/50 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3">
+                          <p className="text-sm text-foreground">{a.message}</p>
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                            {a.type}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground" title={formatFullDate(a.createdAt)}>
+                          {a.actor} — {formatRelativeTime(a.createdAt)}
                         </p>
                       </div>
                     </div>

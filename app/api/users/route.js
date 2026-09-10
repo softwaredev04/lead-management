@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import User from "@/lib/models/User";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAuth } from "@/lib/auth";
 import { USER_ROLES } from "@/lib/config";
 
 const createUserSchema = z.object({
@@ -15,7 +15,9 @@ const createUserSchema = z.object({
 });
 
 export async function GET(request) {
-  const { response, user: admin } = requireAdmin(request);
+  // Any signed-in user may list users (needed for lead-assignment dropdowns).
+  // Password hashes are stripped; user mutations remain admin-only.
+  const { response, user: admin } = requireAuth(request);
   if (response) return response;
 
   try {

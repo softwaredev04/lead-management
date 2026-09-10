@@ -129,6 +129,7 @@ export async function PUT(request, { params }) {
       }));
     }
 
+    if (!Array.isArray(existing.activities)) existing.activities = [];
     if (activities.length) existing.activities.push(...activities);
 
     await existing.save();
