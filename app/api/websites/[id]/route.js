@@ -3,13 +3,14 @@ import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import Website from "@/lib/models/Website";
 import Lead from "@/lib/models/Lead";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth, requireRole } from "@/lib/auth";
+import { WRITE_ROLES } from "@/lib/config";
 import { normalizeDomain } from "@/lib/config";
 
 const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
 export async function PUT(request, { params }) {
-  const { response } = verifyAuth(request);
+  const { response } = requireRole(request, WRITE_ROLES);
   if (response) return response;
 
   try {
@@ -70,7 +71,7 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
-  const { response } = verifyAuth(request);
+  const { response } = requireRole(request, WRITE_ROLES);
   if (response) return response;
 
   try {

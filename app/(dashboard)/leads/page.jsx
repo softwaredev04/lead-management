@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, getCurrentUser } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,6 +66,10 @@ export default function LeadsPage() {
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState([]);
+  const [users, setUsers] = useState([]); // team members for bulk assignment
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [me] = useState(() => (typeof window !== "undefined" ? getCurrentUser() : null));
 
   // Date range
   const [startDate, setStartDate] = useState("");
@@ -169,10 +173,17 @@ export default function LeadsPage() {
       const map = {};
       for (const site of w) map[site.domain] = site.name;
       setWebsiteMap(map);
+      // Team members for the assign dropdown (any write role can fetch names)
+      if (me && me.role !== "viewer") {
+        try {
+          const res = await api.getUsers();
+          setUsers(res.users || []);
+        } catch {}
+      }
     } catch (err) {
       toast.error(err.message);
     }
-  }, []);
+  }, [me]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -293,6 +304,23 @@ export default function LeadsPage() {
       toast.error(err.message || "Failed to delete lead.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  // --- Bulk Actions ---
+  async function runBulk(payload, successMsg) {
+    if (selectedIds.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await api.bulkLeads({ ids: selectedIds, ...payload });
+      toast.success(successMsg(res));
+      setSelectedIds([]);
+      setBulkConfirm(false);
+      loadLeads();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -562,6 +590,62 @@ export default function LeadsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk actions bar */}
+      {selectedIds.length > 0 && (
+        <div className="animate-fade-in flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+          <span className="text-sm font-medium text-foreground">
+            {selectedIds.length} selected
+          </span>
+          <select
+            value=""
+            disabled={bulkBusy}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) runBulk({ action: "status", status: v }, (r) => `Updated ${r.modified} lead(s).`);
+            }}
+            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring"
+          >
+            <option value="">Set status…</option>
+            {["New", "Contacted", "Closed", "Spam"].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <select
+            value=""
+            disabled={bulkBusy}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "unassign")
+                runBulk({ action: "unassign" }, (r) => `Unassigned ${r.modified} lead(s).`);
+              else if (v)
+                runBulk({ action: "assign", assigneeId: v }, (r) => `Assigned ${r.modified} lead(s).`);
+            }}
+            className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring"
+          >
+            <option value="">Assign to…</option>
+            {users.map((u) => (
+              <option key={u._id} value={u._id}>{u.name}</option>
+            ))}
+            <option value="unassign">— Unassign —</option>
+          </select>
+          {me?.role === "admin" && (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={bulkBusy}
+              onClick={() => setBulkConfirm(true)}
+            >
+              <Trash2 className="mr-1 size-3" />
+              Delete
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" disabled={bulkBusy} onClick={() => setSelectedIds([])}>
+            Clear
+          </Button>
+          {bulkBusy && <span className="text-xs text-muted-foreground">Working…</span>}
+        </div>
+      )}
 
       {/* Table */}
       <Card className="animate-fade-in">

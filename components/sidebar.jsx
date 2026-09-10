@@ -17,14 +17,14 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { clearToken } from "@/lib/api";
+import { clearToken, getCurrentUser } from "@/lib/api";
 
-const navItems = [
+const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/websites", label: "Websites", icon: Globe },
   { href: "/services", label: "Services", icon: Layers },
-  { href: "/users", label: "Users", icon: UserCog },
+  { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
   { href: "/preview", label: "Email Preview", icon: Mail },
 ];
 
@@ -38,6 +38,11 @@ export function Sidebar() {
       ? document.documentElement.classList.contains("dark")
       : false
   );
+
+  // Only admins (and legacy sessions without a role) can manage users
+  const me = getCurrentUser();
+  const isAdmin = !me || me.role === "admin";
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((i) => !i.adminOnly);
 
   function toggleTheme() {
     const next = !dark;

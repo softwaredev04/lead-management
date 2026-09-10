@@ -106,6 +106,13 @@ export async function POST(request) {
     const lead = await Lead.create({
       ...data,
       isTest: data.isTest === true,
+      activities: [
+        {
+          type: "created",
+          message: `Lead received from ${data.website}`,
+          actor: "Website Form",
+        },
+      ],
       utm: {
         source: data.utm_source,
         medium: data.utm_medium,

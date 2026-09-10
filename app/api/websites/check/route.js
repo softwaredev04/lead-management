@@ -3,13 +3,14 @@ import { z } from "zod";
 import { connectDB } from "@/lib/db";
 import Website from "@/lib/models/Website";
 import Lead from "@/lib/models/Lead";
-import { verifyAuth } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { WRITE_ROLES } from "@/lib/config";
 
 // Simulates an external website submitting a lead through the public
 // POST /api/leads endpoint, then verifies the lead actually landed in the
 // database. Test leads are flagged isTest and skip email notifications.
 export async function POST(request) {
-  const { response } = verifyAuth(request);
+  const { response } = requireRole(request, WRITE_ROLES);
   if (response) return response;
 
   try {
@@ -145,7 +146,7 @@ async function markFailed(websiteId) {
 
 // Bulk cleanup of test leads created by connection checks
 export async function DELETE(request) {
-  const { response } = verifyAuth(request);
+  const { response } = requireRole(request, WRITE_ROLES);
   if (response) return response;
 
   try {

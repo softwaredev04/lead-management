@@ -106,14 +106,28 @@ lead-management/
 
 ---
 
-# Authentication
+# Authentication & User Management
 
-- Only one admin login
-- No registration
-- No multiple users
-- No employee/role management
-- JWT-based authentication with 7-day expiry
-- Single admin account auto-seeded
+- JWT-based authentication with 7-day expiry (role embedded in token)
+- No public registration — users are created by an admin on the Users page
+- Multiple users supported with roles (see User Roles & Permissions below)
+- Deactivated accounts cannot log in; `lastLoginAt` recorded on every login
+- Single admin account auto-seeded (`ADMIN_EMAIL`/`ADMIN_PASSWORD`), self-repairs on seed
+
+# User Roles & Permissions
+
+| Role | Label | Capabilities |
+| ---- | ----- | ------------ |
+| `admin` | Admin | Everything: user management, all CRUD, delete leads, connection checks |
+| `manager` | Manager | Work leads, manage services & websites, view dashboard |
+| `team_lead` | Team Lead | Work leads, manage services & websites, view dashboard |
+| `sales_agent` | Sales Agent | Work leads: update status/notes/service/assignment |
+| `viewer` | Viewer | Read-only: view leads and dashboard |
+
+- `WRITE_ROLES` in `lib/config.js` is the single source of truth for "can work leads"
+- `lib/auth.js` guards: `requireAuth` (any active user), `requireWrite` (WRITE_ROLES), `requireAdmin`
+- User management endpoints are admin-only; Users nav item hidden for non-admins
+- Self-guards: cannot demote/deactivate/delete yourself; cannot delete or deactivate the last active admin
 
 ---
 
@@ -132,13 +146,14 @@ Simple login page with email + password → JWT token stored in localStorage.
 
 ## Leads Page
 
-Table columns: Name, Phone, Email, Website, Service, Source, Status, Created Date, Actions.
-Features: Search (name/phone/email/company/message), Pagination, Sorting, Filters (Website, Status, Service, Date).
+Table columns: Name, Phone, Email, Website, Service, Source, Status, Assigned To, Created Date, Actions.
+Features: Search (name/phone/email/company/message), Pagination, Sorting, Filters (Website, Status, Service, Date, Assignee), row selection with Bulk Actions (status change, assign to user, delete), CSV export, and a TEST badge on connection-check leads (`isTest`).
 
 ## Lead Details Page
 
 Displays: Name, Email, Phone, Company, Message, Website, Landing Page, Service, Status, Notes, Created/Updated Date, Referrer, UTM fields (source/medium/campaign/term/content), IP Address, Country, City, Browser, OS, Device Type.
-Editable fields only: Status, Notes, Service. Original lead data remains unchanged.
+Editable fields only: Status, Notes, Service, Assigned To (team-member dropdown). Original lead data remains unchanged.
+Includes an Activity Timeline: every status change, assignment, service change, note addition, and lead creation is logged with actor, role, and timestamp (`activities[]`).
 
 ## Services Page
 
@@ -146,7 +161,15 @@ Manage available services (CRUD).
 
 ## Websites Page
 
-Manage connected websites (CRUD).
+Manage connected websites (CRUD) plus connection health monitoring:
+- Health badges: Connected (real lead ≤7d), Stale (8–30d), Dormant (30d+), Never Connected
+- Per-website stats: total leads, leads in last 7 days, last lead time, last check result
+- Connection Check: sends a real test lead through the public API, verifies it landed in the database, records latency; emails suppressed, lead flagged `isTest`
+- Delete guard: websites with existing leads cannot be deleted (HTTP 409)
+
+## Users Page
+
+Admin-only user management: add, view, edit (name/email/role), activate/deactivate, reset password, and delete users, with self/last-admin guards.
 
 ---
 
@@ -192,11 +215,22 @@ Manage connected websites (CRUD).
 | GET    | `/api/leads/:id`    | Get single lead                                |
 | PUT    | `/api/leads/:id`    | Update lead (status, notes, service only)      |
 | DELETE | `/api/leads/:id`    | Delete a lead                                  |
-| GET    | `/api/websites`     | List websites                                  |
-| POST   | `/api/websites`     | Create website                                 |
-| GET    | `/api/services`     | List services                                  |
-| POST   | `/api/services`     | Create service                                 |
-| POST   | `/api/auth/login`   | Admin login                                    |
+| GET    | `/api/websites`       | List websites                                  |
+| POST   | `/api/websites`       | Create website                                 |
+| PUT    | `/api/websites/:id`   | Update website                                 |
+| DELETE | `/api/websites/:id`   | Delete website (409 if leads exist)            |
+| GET    | `/api/websites/stats` | Per-website lead stats + connection health     |
+| POST   | `/api/websites/check` | Send test lead & verify connection             |
+| DELETE | `/api/websites/check` | Remove all test leads                          |
+| GET    | `/api/services`       | List services                                  |
+| POST   | `/api/services`       | Create service                                 |
+| GET    | `/api/users`          | List users + current session info (admin)      |
+| POST   | `/api/users`          | Create user (admin)                            |
+| GET    | `/api/users/:id`      | Get user (admin)                               |
+| PUT    | `/api/users/:id`      | Update user (admin, self/last-admin guarded)   |
+| DELETE | `/api/users/:id`      | Delete user (admin, self/last-admin guarded)   |
+| POST   | `/api/leads/bulk`     | Bulk status/assign/delete on selected leads    |
+| POST   | `/api/auth/login`     | Login (any active user; role returned in JWT)  |
 
 ## Lead POST Payload (External Form Submission)
 
@@ -262,7 +296,7 @@ External websites can POST leads without any authentication token.
 
 | Collection   | Purpose                               |
 | ------------ | ------------------------------------- |
-| `users`    | Single admin account                  |
+| `users`    | Team accounts with roles (admin-managed) |
 | `leads`    | All lead submissions from all domains |
 | `websites` | Registered ClickMasters websites      |
 | `services` | Available service categories          |
@@ -280,6 +314,10 @@ External websites can POST leads without any authentication token.
   landingPage: String,
   service: String,
   status: String (enum: New/Contacted/Closed/Spam, default: "New"),
+  assigneeId: ObjectId (ref: User, nullable),
+  assigneeName: String,
+  isTest: Boolean (default false — connection-check leads, excluded from stats),
+  activities: [{ type, message, actor, actorId, createdAt }],
   source: String,
   referrer: String,
   utm: { source, medium, campaign, term, content },
@@ -300,7 +338,8 @@ External websites can POST leads without any authentication token.
 
 # Security
 
-- JWT Authentication (Bearer token)
+- JWT Authentication (Bearer token, includes user role)
+- Role-based endpoint guards (requireAuth / requireWrite / requireAdmin)
 - Password hashing (bcrypt)
 - Input validation (Zod schemas)
 - CORS enabled
