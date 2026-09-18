@@ -58,7 +58,8 @@ lead-management/
 │       └── geo.js
 ├── scripts/seed.js
 ├── .env                         # Environment configuration (see .env.example)
-├── plan.md                      # ERP Project Connectors integration plan
+├── leadcrmplan.md               # CRM-oriented ERP integration plan
+├── erpplan.md                   # ERP contract reference
 ├── AGENTS.md                    # Full product / agent context
 └── package.json
 ```
@@ -128,4 +129,5 @@ CRM_EXTERNAL_COMPANY_ID=clickmasters-lead-crm
    On `connectDB()`, admin / websites / services are seeded if missing.
 
 5. **ERP integration trust**:
-   Never expose `INTEGRATION_CONFIRM_SECRET` to the browser. Consent page only carries `requestId`; confirm runs in CRM API routes via `lib/services/erpIntegration.js`.
+   Never expose `INTEGRATION_CONFIRM_SECRET` to the browser. Consent page only carries `requestId`; confirm runs in CRM API routes via `lib/services/erpIntegration.js`. Inbound ERP calls use `lib/services/integrationAuth.js` (secret + Ed25519).
+   Plans: `leadcrmplan.md`, `erpplan.md`.

@@ -102,8 +102,10 @@ lead-management/
 │       ├── email.js         # SMTP email service
 │       ├── emailTemplates.js # HTML email templates
 │       ├── erpIntegration.js # ERP authorize-request + confirm client
+│       ├── integrationAuth.js # Inbound ERP secret + Ed25519 verify
 │       └── geo.js           # Device/IP detection
-├── plan.md                  # ERP ↔ CRM integration plan
+├── leadcrmplan.md           # CRM-oriented integration plan
+├── erpplan.md               # ERP-oriented integration plan (contract reference)
 ├── .env.example             # Env template (incl. ERP keys)
 ├── scripts/
 │   └── seed.js              # Auto-seeds admin + defaults
@@ -203,9 +205,11 @@ ERP **Project Connectors** handshake (Phase 2 — implemented). Sidebar: **Conne
 
 **Trust model:** browser only carries opaque `requestId`. Integration trust is server-to-server confirm + stored ERP **public key** — never treat localStorage JWT as the ERP↔CRM link. CRM never stores ERP private keys.
 
-**Disconnect (admin):** revokes CRM-side status to `revoked`. Notifying ERP is Phase 5. Scoped lead APIs / Web Leads credentials are Phase 3.
+**Disconnect (admin):** revokes CRM-side status to `revoked` — ERP signed lead APIs then fail (`No active integration`). Notifying ERP is Phase 5.
 
-Full plan: `plan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CRM_EXTERNAL_COMPANY_ID` (see `.env.example`).
+**Scoped leads (Phase 3):** `GET /api/integrations/leads` — ERP calls with `X-Integration-Secret` + Ed25519 headers; CRM verifies against stored `publicKey` and scope `crm.leads.read`.
+
+Full plan: `leadcrmplan.md` / `erpplan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CRM_EXTERNAL_COMPANY_ID` (see `.env.example`).
 
 ---
 
@@ -271,6 +275,7 @@ Full plan: `plan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CR
 | GET    | `/api/integrations/authorize-request/:requestId` | Proxy ERP consent metadata (auth) |
 | POST   | `/api/integrations/confirm` | Create ConnectedIntegration + ERP confirm |
 | POST   | `/api/integrations/:id/disconnect` | Revoke CRM-side link (admin)        |
+| GET    | `/api/integrations/leads` | ERP-signed scoped leads (secret + Ed25519; scope `crm.leads.read`) |
 
 ## Lead POST Payload (External Form Submission)
 
@@ -442,8 +447,8 @@ The following features are documented in the system requirements but **not yet i
 
 ## ERP Project Connectors (remaining)
 
-- ✅ Phase 1–2: ERP connect + CRM consent/confirm (`plan.md`)
-- Phase 3: Web Leads via integration credentials (replace hard-coded CRM JWT); scope-enforced APIs
+- ✅ Phase 1–2: ERP connect + CRM consent/confirm
+- ✅ Phase 3: Web Leads via ERP proxy + CRM `GET /api/integrations/leads` (secret + Ed25519)
 - Phase 4: Alpha AI Tracker (same handshake pattern)
 - Phase 5: Disconnect webhook CRM→ERP, key rotation, rate limits
 
@@ -539,7 +544,7 @@ INTEGRATION_CONFIRM_SECRET=clickmasters-integration-confirm-dev-change-me
 CRM_EXTERNAL_COMPANY_ID=clickmasters-lead-crm
 ```
 
-`ERP_API_BASE_URL` and `INTEGRATION_CONFIRM_SECRET` must match the ERP Project Connectors setup (secret is sent as HTTP header `X-Integration-Secret`, not as an env var name). See `.env.example` and `plan.md`.
+`ERP_API_BASE_URL` and `INTEGRATION_CONFIRM_SECRET` must match the ERP Project Connectors setup (secret is sent as HTTP header `X-Integration-Secret`, not as an env var name). See `.env.example`, `leadcrmplan.md`, and `erpplan.md`.
 
 ---
 

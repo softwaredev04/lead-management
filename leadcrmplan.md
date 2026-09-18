@@ -15,23 +15,23 @@
 | **0** UI shell (Project Connectors page) | ✅ Done | ERP frontend |
 | **1** ERP connection core (models + APIs + UI wired) | ✅ Done | ERP backend + frontend |
 | **2** CRM authorize + consent + confirm | ✅ Done | **CRM project** (`crm.clickmasters.pk`) |
-| **3** Scoped APIs + Web Leads via integration | Pending | ERP + CRM |
+| **3** Scoped APIs + Web Leads via integration | ✅ Done | ERP proxy + CRM `GET /api/integrations/leads` |
 | **4** Alpha AI Tracker (same pattern) | Pending | Alpha + ERP |
 | **5** Harden / ops | Pending | Both |
 
-### What works today (ERP + CRM Phase 2)
+### What works today (ERP + CRM Phase 2–3)
 
 1. Admin opens **Configurations → Project Connectors** (`/admin/project-connectors`).
 2. Clicks **Connect** on Lead CRM → ERP creates a one-time `IntegrationAuthorizationRequest` and opens:
    `https://crm.clickmasters.pk/connect/authorize?request=<requestId>&target=lead-crm`
 3. CRM shows consent (login + `returnTo` if needed) → **Authorize** creates `ConnectedIntegration` and calls ERP `POST /integrations/confirm`.
 4. After successful confirm, ERP shows **Connected**. CRM **Connected Apps** (`/integrations`) lists the link; **Disconnect** revokes on CRM (ERP notify = Phase 5).
+5. ERP Web Leads calls ERP `GET /integrations/lead-crm/leads` → CRM `GET /api/integrations/leads` (secret + Ed25519; no CRM JWT in browser).
 
 ### What does NOT work yet
 
-- Web Leads still uses a temporary hard-coded CRM JWT (not integration credentials) — Phase 3.
 - Disconnect is CRM-local only (ERP not notified yet) — Phase 5.
-- Scoped CRM APIs enforcing `externalCompanyId` — Phase 3.
+- Multi-tenant lead partitioning per ERP company (CRM is still single-tenant; verified connection reads this CRM’s non-test leads).
 
 ---
 
@@ -254,11 +254,34 @@ Must match ERP `INTEGRATION_CONFIRM_SECRET`.
 
 ## 6. Later phases (short)
 
-### Phase 3 — Value (Web Leads for real)
+### Phase 3 — Value (Web Leads for real) — DONE
 
-- Replace hard-coded CRM JWT in ERP Web Leads with connection-scoped credential / ERP proxy.
-- CRM APIs enforce scopes + linked `externalCompanyId`.
-- Multi-tenant: each ERP company only sees its linked CRM data.
+**ERP (done):**
+
+- `GET /integrations/lead-crm/leads` proxy (active connection + scope + signed outbound call).
+- `PanelWebLeads` uses ERP JWT only (hard-coded CRM token removed).
+- Env: `CRM_API_BASE_URL=https://crm.clickmasters.pk`
+
+**CRM (done):**
+
+```http
+GET /api/integrations/leads?page&limit&sort&order
+Headers:
+  X-Integration-Secret
+  X-ERP-Company-Id
+  X-ERP-Connection-Id
+  X-ERP-Key-Id
+  X-ERP-Timestamp
+  X-ERP-Signature   # Ed25519 over `${timestamp}.${companyId}.${connectionId}`
+```
+
+Verify secret → find active `ConnectedIntegration` by `externalCompanyId` → verify signature with stored `publicKey` (skew ≤5m) → enforce `crm.leads.read` → return non-test leads:
+
+`{ data, page, limit, total, totalPages }`
+
+Files: `app/api/integrations/leads/route.js`, `lib/services/integrationAuth.js`
+
+See also `erpplan.md` §0.1b for the full contract.
 
 ### Phase 4 — Alpha
 
@@ -287,10 +310,10 @@ Must match ERP `INTEGRATION_CONFIRM_SECRET`.
 - [x] ERP can create / list / confirm / revoke integrations (Phase 1)
 - [x] Connect from ERP opens CRM consent; Cancel leaves no connection
 - [x] Authorize creates active records on **both** sides
-- [ ] Disconnect blocks further API access
+- [x] Disconnect blocks further API access
 - [x] Replay of same authorize request fails
 - [x] Expired request fails cleanly
-- [ ] Web Leads uses integration credentials, not a shared admin JWT
+- [x] Web Leads uses integration credentials, not a shared admin JWT
 - [ ] Adding Alpha does not redesign the handshake
 
 ---
@@ -303,21 +326,20 @@ Must match ERP `INTEGRATION_CONFIRM_SECRET`.
 
 ## 10. Handoff checklist for CRM developer / next chat
 
-Phase 2 is implemented in this CRM repo. Remaining:
+Phase 2–3 implemented in this CRM repo. Remaining:
 
-1. Add to CRM `.env` (see `.env.example`):
-   - `ERP_API_BASE_URL` (e.g. `http://192.168.88.36:3000` or `https://apierp.clickmasters.pk`)
-   - `INTEGRATION_CONFIRM_SECRET` (must match ERP)
-2. End-to-end test: ERP Connect → CRM consent → both show Connected.
-3. After Phase 2 works end-to-end, return to ERP for Phase 3 (Web Leads hardening).
+1. E2E: ERP Web Leads page loads leads after Connect (ERP `CRM_API_BASE_URL` must point at this CRM).
+2. Phase 4 (Alpha) or Phase 5 (disconnect notify / harden).
 
-### CRM files (Phase 2)
+### CRM files (Phase 2–3)
 
 | File | Role |
 | --- | --- |
 | `app/connect/authorize/page.jsx` | Consent UI |
 | `app/(dashboard)/integrations/page.jsx` | Connected Apps list + disconnect |
 | `app/api/integrations/*` | Proxy, confirm, list, disconnect |
+| `app/api/integrations/leads/route.js` | ERP-signed scoped leads API |
+| `lib/services/integrationAuth.js` | Secret + Ed25519 inbound auth |
 | `lib/models/ConnectedIntegration.js` | Durable CRM-side link |
 | `lib/models/IntegrationAudit.js` | Audit log |
 | `lib/services/erpIntegration.js` | ERP HTTP client (secret stays server-side) |
