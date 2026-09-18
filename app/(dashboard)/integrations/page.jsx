@@ -27,12 +27,33 @@ function IntegrationsContent() {
   const me = getCurrentUser();
   const isAdmin = !me || me.role === "admin";
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ silent } = {}) => {
     try {
       const res = await api.getIntegrations();
-      setItems(res.data || []);
+      setItems((prev) => {
+        const next = res.data || [];
+        if (!silent && prev.length) {
+          const prevActive = new Set(
+            prev.filter((i) => i.status === "active").map((i) => i.id)
+          );
+          for (const row of next) {
+            if (row.status === "revoked" && prevActive.has(row.id)) {
+              toast.message(`${row.companyName || "ERP"} revoked (live sync)`);
+            }
+            if (row.status === "active" && !prevActive.has(row.id)) {
+              const wasRevoked = prev.find(
+                (p) => p.id === row.id && p.status === "revoked"
+              );
+              if (wasRevoked) {
+                toast.success(`${row.companyName || "ERP"} reconnected`);
+              }
+            }
+          }
+        }
+        return next;
+      });
     } catch (err) {
-      toast.error(err.message);
+      if (!silent) toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -43,6 +64,21 @@ function IntegrationsContent() {
       load();
     }, 0);
     return () => clearTimeout(t);
+  }, [load]);
+
+  // Live status: poll while Connected Apps is open (webhook + poll until Socket.io on both apps)
+  useEffect(() => {
+    const id = setInterval(() => {
+      load({ silent: true });
+    }, 5000);
+    function onFocus() {
+      load({ silent: true });
+    }
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [load]);
 
   useEffect(() => {
@@ -62,7 +98,7 @@ function IntegrationsContent() {
     }
     if (
       !window.confirm(
-        `Disconnect ${companyName || "this app"}? ERP will no longer be trusted by CRM until reconnect.`
+        `Disconnect ${companyName || "this app"}? This will revoke on CRM and notify ERP.`
       )
     ) {
       return;
@@ -70,8 +106,16 @@ function IntegrationsContent() {
 
     setDisconnectingId(id);
     try {
-      await api.disconnectIntegration(id);
-      toast.success("Connection revoked");
+      const res = await api.disconnectIntegration(id);
+      if (res.erpNotified) {
+        toast.success("Revoked on CRM and ERP");
+      } else {
+        toast.success("Revoked on CRM");
+        toast.message(
+          res.erpNote ||
+            "ERP still shows Connected until it implements external-disconnect"
+        );
+      }
       await load();
     } catch (err) {
       toast.error(err.message);
@@ -89,7 +133,8 @@ function IntegrationsContent() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Connected Apps</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage ERP links authorized from Project Connectors.
+            Manage ERP links authorized from Project Connectors. Status refreshes
+            live every 5s (and when ERP posts a status webhook).
           </p>
         </div>
         <Button
