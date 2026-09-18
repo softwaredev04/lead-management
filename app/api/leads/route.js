@@ -37,7 +37,7 @@ const createSchema = z.object({
 });
 
 export async function GET(request) {
-  const { response } = verifyAuth(request);
+  const { user, response } = verifyAuth(request);
   if (response) return response;
 
   try {
@@ -65,8 +65,19 @@ export async function GET(request) {
       filter.createdAt = dateFilter;
     }
 
-    // Assignee filter
-    if (searchParams.get("assignee")) filter.assignee = searchParams.get("assignee");
+    // Assignee filter — legacy name match or assigneeId (me | none | <ObjectId>)
+    const assigneeParam = searchParams.get("assignee");
+    if (assigneeParam) filter.assignee = assigneeParam;
+    const assigneeIdParam = searchParams.get("assigneeId");
+    if (assigneeIdParam === "me") {
+      const meId = user.userId || user.id || user._id;
+      if (meId) filter.assigneeId = meId;
+    } else if (assigneeIdParam === "none") {
+      // null matches both unset and null in MongoDB
+      filter.assigneeId = null;
+    } else if (assigneeIdParam && /^[0-9a-fA-F]{24}$/.test(assigneeIdParam)) {
+      filter.assigneeId = assigneeIdParam;
+    }
 
     const search = searchParams.get("search");
     let query = Lead.find(filter);
@@ -74,9 +85,10 @@ export async function GET(request) {
       query = Lead.find({ ...filter, $text: { $search: search } });
     }
 
+    const countFilter = search ? { ...filter, $text: { $search: search } } : filter;
     const [leads, total] = await Promise.all([
       query.sort({ [sortField]: sortDir }).skip(skip).limit(limit).lean(),
-      Lead.countDocuments(filter),
+      Lead.countDocuments(countFilter),
     ]);
 
     return NextResponse.json(
@@ -103,13 +115,21 @@ export async function POST(request) {
     const data = parsed.data;
     const device = captureDeviceInfo(request);
 
+    // Duplicate-Lead Detection: check if the same email (or phone) recently
+    // submitted a lead within the window. Flag the new lead so the team can spot
+    // repeat submissions (does NOT block the submission — just marks it).
+    const duplicateMatch = await Lead.findDuplicate(data);
+
     const lead = await Lead.create({
       ...data,
       isTest: data.isTest === true,
+      isDuplicate: !!duplicateMatch,
       activities: [
         {
           type: "created",
-          message: `Lead received from ${data.website}`,
+          message: duplicateMatch
+            ? `Lead received from ${data.website} — possible duplicate of ${duplicateMatch.name} (${duplicateMatch.email || duplicateMatch.phone})`
+            : `Lead received from ${data.website}`,
           actor: "Website Form",
         },
       ],
@@ -126,6 +146,10 @@ export async function POST(request) {
       os: device.os,
       deviceType: device.deviceType,
     });
+
+    // Auto-score the lead based on data completeness and recency
+    lead.leadScore = Lead.calculateScore(lead);
+    await lead.save();
 
     // Skip email notifications for automated test leads (connection checks)
     if (!lead.isTest) notifyNewLead(lead);

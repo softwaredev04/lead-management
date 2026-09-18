@@ -5,6 +5,7 @@ import Lead from "@/lib/models/Lead";
 import User from "@/lib/models/User";
 import { requireRole, requireAdmin } from "@/lib/auth";
 import { WRITE_ROLES, LEAD_STATUSES } from "@/lib/config";
+import { notifyAssignment } from "@/lib/services/email";
 
 const bulkSchema = z.object({
   ids: z.array(z.string().min(1)).min(1, "Select at least one lead"),
@@ -71,6 +72,10 @@ export async function POST(request) {
       if (!assignedUser) {
         return NextResponse.json({ error: "Invalid assignee — user not found" }, { status: 400 });
       }
+      // Capture affected leads first (for assignment emails) — only ones changing assignee
+      const affected = await Lead.find({ ...filter, assigneeId: { $ne: assignedUser._id } })
+        .select("_id")
+        .lean();
       const result = await Lead.updateMany(
         { ...filter, assigneeId: { $ne: assignedUser._id } },
         {
@@ -86,6 +91,10 @@ export async function POST(request) {
         }
       );
       modified = result.modifiedCount;
+      // One assignment email per affected lead (capped to avoid mail storms)
+      for (const doc of affected.slice(0, 10)) {
+        notifyAssignment(doc._id, assignedUser._id, actor).catch(() => {});
+      }
     }
 
     return NextResponse.json({ success: true, modified });
