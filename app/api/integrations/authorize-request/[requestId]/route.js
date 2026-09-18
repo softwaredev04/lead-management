@@ -37,9 +37,11 @@ export async function GET(request, { params }) {
     return NextResponse.json({ data: meta });
   } catch (err) {
     const status = err.status || 500;
-    return NextResponse.json(
-      { error: err.message || "Failed to load authorization request" },
-      { status }
-    );
+    const payload = {
+      error: err.message || "Failed to load authorization request",
+    };
+    if (err.debugKeys) payload.debugKeys = err.debugKeys;
+    if (err.code) payload.code = err.code;
+    return NextResponse.json(payload, { status });
   }
 }

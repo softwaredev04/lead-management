@@ -8,26 +8,126 @@
 
 ---
 
+## ★ FOR ERP AI ASSISTANT — read & answer (copy this file into the ERP repo)
+
+**You are in the ERP codebase.** CRM is failing Connect consent with:
+
+> `ERP authorize-request response is missing publicKey.`
+
+CRM calls: `GET {ERP_API}/integrations/authorize-request/{requestId}`  
+Then stores that `publicKey` on `ConnectedIntegration` and later verifies Web Leads Ed25519 signatures with it.
+
+**Your job:** Inspect ERP integration models/controllers/utils, answer every question below with evidence (file path + short snippet or field list). If something is unclear, say what is missing and propose the fix. Prefer fixing the authorize-request handler so the JSON always includes a non-empty `publicKey`.
+
+### Context CRM already has
+
+- Consent UI: `https://crm.clickmasters.pk/connect/authorize?request=<id>&target=lead-crm`
+- CRM reads nested keys too (`publicKey`, `public_key`, `publicKeyPem`, under `data` / `connection`, etc.) — empty/omitted still fails
+- Confirm: `POST /integrations/confirm` + header `X-Integration-Secret`
+- Leads: CRM `GET /api/integrations/leads` expects secret + Ed25519 over `` `${timestamp}.${companyId}.${connectionId}` ``
+
+### Questions — answer in place
+
+**A. Authorize-request payload**
+
+1. What exact JSON does `GET /integrations/authorize-request/:requestId` return today? (List top-level keys + nested keys; paste a redacted example.)  
+   **ANSWER:**
+
+2. Where does `publicKey` live — on `IntegrationAuthorizationRequest`, only on `IntegrationConnection`, both, or nowhere in the GET response?  
+   **ANSWER:**
+
+3. On Connect, does ERP copy `publicKey` / `keyId` / `connectionId` onto the authorization request document? Cite the create/connect code.  
+   **ANSWER:**
+
+4. Is `publicKey` excluded via `select: false`, a DTO omit, or `.select()` projection on the authorize-request GET?  
+   **ANSWER:**
+
+5. What encoding is stored/returned for `publicKey`? (PEM / base64 SPKI / base64 raw 32-byte / other)  
+   **ANSWER:**
+
+**B. Connect flow**
+
+6. Are Ed25519 keys generated before the authorize URL is returned to the browser?  
+   **ANSWER:**
+
+7. Exact `LEAD_CRM_AUTHORIZE_URL` / authorize URL builder (path + query params)?  
+   **ANSWER:**
+
+8. Value of `INTEGRATION_AUTH_TTL_SECONDS` (default if unset)?  
+   **ANSWER:**
+
+**C. Env**
+
+9. Confirm env keys exist and purpose: `INTEGRATION_CONFIRM_SECRET`, `LEAD_CRM_AUTHORIZE_URL`, `CRM_API_BASE_URL`. Any mismatch risk with CRM?  
+   **ANSWER:**
+
+10. Is private key the only secret field (`select: false`)? Public key must be readable for CRM.  
+    **ANSWER:**
+
+**D. Confirm + Web Leads signing**
+
+11. What body fields does `POST /integrations/confirm` accept/require?  
+    **ANSWER:**
+
+12. Exact string signed for CRM leads proxy: is it `` `${timestamp}.${companyId}.${connectionId}` ``? Which ids (company `_id`? connection `_id`)?  
+    **ANSWER:**
+
+13. Header names ERP sends to CRM for leads — match `X-Integration-Secret`, `X-ERP-Company-Id`, `X-ERP-Connection-Id`, `X-ERP-Key-Id`, `X-ERP-Timestamp`, `X-ERP-Signature`?  
+    **ANSWER:**
+
+**E. Verdict**
+
+14. Today, within ~10s of Connect, does authorize-request JSON include a **non-empty** `publicKey`? **Yes / No**  
+    **ANSWER:**
+
+15. If No: root cause + concrete code change (file + what to return). If Yes: why would CRM still report missing (wrong path, wrapper, empty string, different field name)?  
+    **ANSWER:**
+
+### After answering
+
+- If `publicKey` is missing: **implement the fix** on ERP `GET /integrations/authorize-request/:id` (and on Connect create if needed), then tell the human to Connect again from ERP UI.
+- Required minimum fields in the response (canonical):
+
+```json
+{
+  "requestId": "...",
+  "jti": "...",
+  "status": "pending",
+  "companyId": "...",
+  "companyName": "...",
+  "userName": "...",
+  "userEmail": "...",
+  "targetSystem": "lead-crm",
+  "scopes": ["crm.leads.read", "crm.leads.create", "crm.customers.read"],
+  "publicKey": "<REQUIRED non-empty Ed25519 public key>",
+  "keyId": "...",
+  "connectionId": "<IntegrationConnection _id>",
+  "expiresAt": "..."
+}
+```
+
+Wrapper like `{ "success": true, "data": { ... } }` is fine if `publicKey` is inside.
+
+---
+
 ## 0. Progress snapshot (read this first when switching projects)
 
 | Phase | Status | Where |
 | --- | --- | --- |
 | **0** UI shell (Project Connectors page) | ✅ Done | ERP frontend |
 | **1** ERP connection core (models + APIs + UI wired) | ✅ Done | ERP backend + frontend |
-| **2** CRM authorize + consent + confirm | ✅ Done | CRM project |
-| **3** Scoped APIs + Web Leads via integration | ✅ Done | ERP proxy + CRM `/api/integrations/leads` |
-| **4** Alpha AI Tracker (same pattern) | Pending | Alpha + ERP |
-| **5** Harden / ops | Pending | Both |
+| **2** CRM authorize + consent + confirm | 🟡 CRM done — **E2E blocked: ERP missing `publicKey` on authorize-request** | CRM ✅ · ERP fix needed |
+| **3** Scoped APIs + Web Leads via integration | ✅ Code done both sides | Needs successful Connect first |
 
 ### What works today (ERP + CRM)
 
-1. Connect / Authorize / Confirm end-to-end (Phase 1–2).
-2. ERP **Web Leads** calls `GET /integrations/lead-crm/leads` (no hard-coded CRM JWT in browser).
-3. Proxy requires **active** `lead-crm` connection + `crm.leads.read`, then calls CRM with shared secret + Ed25519 signature.
-4. CRM `GET /api/integrations/leads` verifies secret + signature + scope and returns non-test leads.
+1. CRM consent page + confirm client + Connected Apps — implemented.
+2. ERP **Web Leads** proxy + CRM `GET /api/integrations/leads` — implemented.
+3. **Blocked:** CRM error `missing publicKey` when calling ERP authorize-request (see ★ section above).
 
 ### What does NOT work yet
 
+- Full Connect → Authorize until ERP returns non-empty `publicKey` (answer ★ questions / fix ERP).
 - Disconnect CRM→ERP notify — Phase 5.
 - Multi-tenant lead partitioning per ERP company (single-tenant CRM for now).
 
@@ -330,16 +430,8 @@ Must match ERP `INTEGRATION_CONFIRM_SECRET`.
 
 ---
 
-## 10. Handoff checklist for CRM developer / next chat
+## 10. Handoff — copy `erpplan.md` + `leadcrmplan.md` into the other repo
 
-When opening the **CRM** codebase, bring this context:
+**Next action:** Open ERP project → paste both plan files → tell the AI: *“Read ★ FOR ERP AI ASSISTANT, answer every ANSWER line from this codebase, then fix missing publicKey if needed.”*
 
-1. ERP Phase 1 is live: `/integrations/*` on ERP API.
-2. Connect URL ERP opens:  
-   `https://crm.clickmasters.pk/connect/authorize?request=<requestId>&target=lead-crm`
-3. CRM must implement that route + consent + `POST {ERP}/integrations/confirm`.
-4. Confirm needs header `X-Integration-Secret` = shared `INTEGRATION_CONFIRM_SECRET`.
-5. Body is `{ "requestId": "..." }` (not the full URL).
-6. Pull consent data from `GET {ERP}/integrations/authorize-request/:requestId`.
-7. Persist `ConnectedIntegration` with ERP `publicKey` / `companyId` / scopes.
-8. After Phase 2 works end-to-end, return to ERP for Phase 3 (Web Leads hardening).
+After ERP answers/fixes: Connect again from ERP UI (new `requestId`; old ones expire ~60s) and confirm CRM consent works.
