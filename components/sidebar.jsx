@@ -10,6 +10,7 @@ import {
   Globe,
   Layers,
   Mail,
+  Link2,
   LogOut,
   Sun,
   Moon,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/websites", label: "Websites", icon: Globe },
   { href: "/services", label: "Services", icon: Layers },
+  { href: "/integrations", label: "Connected Apps", icon: Link2 },
   { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
   { href: "/preview", label: "Email Preview", icon: Mail },
 ];

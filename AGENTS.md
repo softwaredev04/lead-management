@@ -53,7 +53,7 @@ Instead of checking multiple websites and multiple emails, every lead should app
 | Frontend   | Next.js (App Router)     |
 | Backend    | Next.js API Routes       |
 | Database   | MongoDB + Mongoose       |
-| Auth       | JWT (single admin login) |
+| Auth       | JWT (multi-user login, role in token) |
 | Styling    | Tailwind CSS + shadcn/ui |
 | Validation | Zod                      |
 | Deployment | Ubuntu, PM2, Nginx       |
@@ -67,14 +67,17 @@ lead-management/
 │   │   ├── dashboard/       # Analytics & charts
 │   │   ├── leads/           # Lead table & details
 │   │   ├── services/        # Manage services
-│   │   └── websites/        # Manage websites
+│   │   ├── websites/        # Manage websites
+│   │   └── integrations/    # Connected Apps (ERP links)
 │   ├── api/
 │   │   ├── auth/            # JWT login
 │   │   ├── health/          # Health check
 │   │   ├── leads/           # Lead CRUD + stats + charts
 │   │   ├── services/        # Service CRUD
-│   │   └── websites/        # Website CRUD
-│   ├── login/               # Admin login page
+│   │   ├── websites/        # Website CRUD
+│   │   └── integrations/    # ERP authorize proxy + confirm + disconnect
+│   ├── connect/authorize/   # ERP consent page (no dashboard chrome)
+│   ├── login/               # Admin login page (supports ?returnTo=)
 │   ├── preview/             # Lead preview/template
 │   ├── layout.js
 │   ├── globals.css
@@ -86,17 +89,22 @@ lead-management/
 ├── lib/
 │   ├── api.js               # Frontend API client
 │   ├── auth.js              # JWT sign/verify
-│   ├── config.js            # Constants (statuses, services, websites)
+│   ├── config.js            # Constants (statuses, services, websites, integration)
 │   ├── db.js                # MongoDB connection
 │   ├── utils.js             # Helpers
 │   ├── models/
 │   │   ├── Lead.js          # Lead schema
-│   │   ├── User.js          # Admin user schema
-│   │   └── Website.js       # Website schema
+│   │   ├── User.js          # User account schema (roles)
+│   │   ├── Website.js       # Website schema
+│   │   ├── ConnectedIntegration.js  # ERP link (public key + scopes)
+│   │   └── IntegrationAudit.js      # Authorize/revoke audit log
 │   └── services/
 │       ├── email.js         # SMTP email service
 │       ├── emailTemplates.js # HTML email templates
+│       ├── erpIntegration.js # ERP authorize-request + confirm client
 │       └── geo.js           # Device/IP detection
+├── plan.md                  # ERP ↔ CRM integration plan
+├── .env.example             # Env template (incl. ERP keys)
 ├── scripts/
 │   └── seed.js              # Auto-seeds admin + defaults
 ├── AGENTS.md                       # This file — project context for AI agents
@@ -118,15 +126,16 @@ lead-management/
 
 | Role | Label | Capabilities |
 | ---- | ----- | ------------ |
-| `admin` | Admin | Everything: user management, all CRUD, delete leads, connection checks |
-| `manager` | Manager | Work leads, manage services & websites, view dashboard |
-| `team_lead` | Team Lead | Work leads, manage services & websites, view dashboard |
-| `sales_agent` | Sales Agent | Work leads: update status/notes/service/assignment |
-| `viewer` | Viewer | Read-only: view leads and dashboard |
+| `admin` | Admin | Everything: user management, all CRUD, delete leads, connection checks, disconnect ERP integrations |
+| `manager` | Manager | Work leads, manage services & websites, view dashboard, authorize ERP connect |
+| `team_lead` | Team Lead | Work leads, manage services & websites, view dashboard, authorize ERP connect |
+| `sales_agent` | Sales Agent | Work leads: update status/notes/service/assignment; can authorize ERP connect |
+| `viewer` | Viewer | Read-only: view leads, dashboard, and Connected Apps; can authorize ERP connect |
 
 - `WRITE_ROLES` in `lib/config.js` is the single source of truth for "can work leads"
 - `lib/auth.js` guards: `requireAuth` (any active user), `requireWrite` (WRITE_ROLES), `requireAdmin`
 - User management endpoints are admin-only; Users nav item hidden for non-admins
+- Integration **disconnect** is admin-only; authorize/confirm requires any logged-in user (`requireAuth`)
 - Self-guards: cannot demote/deactivate/delete yourself; cannot delete or deactivate the last active admin
 
 ---
@@ -136,6 +145,7 @@ lead-management/
 ## Login
 
 Simple login page with email + password → JWT token stored in localStorage.
+Supports `?returnTo=/path` after successful login (same-origin relative paths only — blocks open redirects). Used by the ERP consent flow: `/login?returnTo=/connect/authorize?request=...&target=lead-crm`.
 
 ## Dashboard
 
@@ -143,11 +153,18 @@ Simple login page with email + password → JWT token stored in localStorage.
 - Status cards: New, Contacted, Closed, Spam
 - Charts: Daily Leads, Website-wise Leads, Service-wise Leads, Monthly Leads
 - Recent Leads table
+- Work widgets: **My Leads** (assigned to current user), **Unassigned**, and **Overdue** (unassigned New leads older than `OVERDUE_DAYS` from `lib/config.js`, shown in red when > 0) — each deep-links into the Leads page via `/leads?assigneeId=me|none&status=New`
+- **Team workload** list: lead count per assignee (name + count)
 
 ## Leads Page
 
 Table columns: Name, Phone, Email, Website, Service, Source, Status, Assigned To, Created Date, Actions.
-Features: Search (name/phone/email/company/message), Pagination, Sorting, Filters (Website, Status, Service, Date, Assignee), row selection with Bulk Actions (status change, assign to user, delete), CSV export, and a TEST badge on connection-check leads (`isTest`).
+Features: Search (name/phone/email/company/message), Pagination, Sorting, Filters (Website, Status, Service, Date, Assignee), row selection with Bulk Actions (status change, assign to user, delete), CSV export, a TEST badge on connection-check leads (`isTest`), and a **Duplicate badge** (violet, dashed) on leads flagged as repeat submissions.
+Extras: **Overdue badge** (red, on unassigned New leads older than `OVERDUE_DAYS`), **Saved Views** (persisted filter combinations in `localStorage`), and **deep-link filter support** — `?assigneeId=me|none|<userId>` and `?status=` URL params pre-fill the filters (used by dashboard widgets). Backend `GET /api/leads` accepts `assigneeId=me|none|<ObjectId>` (in addition to legacy `assignee` name filter).
+
+## Duplicate-Lead Detection
+
+On every `POST /api/leads`, the backend checks for a **recent (≤ `DUPLICATE_WINDOW_HOURS` = 24h in `lib/models/Lead.js`) lead with the same email OR same phone** (excluding test leads and the lead being created). If found, the new lead is stored with `isDuplicate: true` and its `created` activity notes the possible duplicate (name/email/phone of the match). **The submission is never blocked** — it is only flagged so the team can review repeat submissions. The leads table shows a violet **Duplicate** badge on such rows.
 
 ## Lead Details Page
 
@@ -170,6 +187,25 @@ Manage connected websites (CRUD) plus connection health monitoring:
 ## Users Page
 
 Admin-only user management: add, view, edit (name/email/role), activate/deactivate, reset password, and delete users, with self/last-admin guards.
+
+## Connected Apps (`/integrations`)
+
+ERP **Project Connectors** handshake (Phase 2 — implemented). Sidebar: **Connected Apps**.
+
+| Step | What happens |
+| ---- | ------------ |
+| 1 | ERP admin clicks Connect Lead CRM → opens `/connect/authorize?request=<requestId>&target=lead-crm` |
+| 2 | If not logged in → `/login?returnTo=...` then back to consent |
+| 3 | CRM proxies `GET {ERP_API_BASE_URL}/integrations/authorize-request/:requestId` (server-side) |
+| 4 | Consent UI shows company, requester, scopes, expiry — **Cancel** or **Authorize** |
+| 5 | Authorize → create/update `ConnectedIntegration` → CRM `POST {ERP}/integrations/confirm` with header `X-Integration-Secret` |
+| 6 | Success → `/integrations`; Cancel never calls confirm (ERP request expires) |
+
+**Trust model:** browser only carries opaque `requestId`. Integration trust is server-to-server confirm + stored ERP **public key** — never treat localStorage JWT as the ERP↔CRM link. CRM never stores ERP private keys.
+
+**Disconnect (admin):** revokes CRM-side status to `revoked`. Notifying ERP is Phase 5. Scoped lead APIs / Web Leads credentials are Phase 3.
+
+Full plan: `plan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CRM_EXTERNAL_COMPANY_ID` (see `.env.example`).
 
 ---
 
@@ -231,6 +267,10 @@ Admin-only user management: add, view, edit (name/email/role), activate/deactiva
 | DELETE | `/api/users/:id`      | Delete user (admin, self/last-admin guarded)   |
 | POST   | `/api/leads/bulk`     | Bulk status/assign/delete on selected leads    |
 | POST   | `/api/auth/login`     | Login (any active user; role returned in JWT)  |
+| GET    | `/api/integrations`   | List ConnectedIntegration records              |
+| GET    | `/api/integrations/authorize-request/:requestId` | Proxy ERP consent metadata (auth) |
+| POST   | `/api/integrations/confirm` | Create ConnectedIntegration + ERP confirm |
+| POST   | `/api/integrations/:id/disconnect` | Revoke CRM-side link (admin)        |
 
 ## Lead POST Payload (External Form Submission)
 
@@ -274,7 +314,12 @@ When a new lead arrives:
 1. **Auto-reply to visitor** — Branded thank-you email confirming receipt.
 2. **Team notification** — Alert emailed to `software.clickmasters@gmail.com` with lead details.
 
-Both emails use beautiful HTML templates matching the ClickMasters brand.
+When a lead is **assigned to a user** (single PUT or bulk assign):
+
+3. **Assignment notification** — Emailed to the assignee's account email with lead details and a direct link to the lead. Fire-and-forget (never blocks or fails the API request); bulk assigns are capped at 10 emails to avoid mail storms. Test leads (`isTest`) never trigger emails.
+
+Both email flows use beautiful HTML templates matching the ClickMasters brand.
+All email sending is **fire-and-forget** — never blocks or fails the API request.
 
 ---
 
@@ -294,12 +339,14 @@ External websites can POST leads without any authentication token.
 
 # Database Collections
 
-| Collection   | Purpose                               |
+| Collection | Purpose |
 | ------------ | ------------------------------------- |
-| `users`    | Team accounts with roles (admin-managed) |
-| `leads`    | All lead submissions from all domains |
-| `websites` | Registered ClickMasters websites      |
-| `services` | Available service categories          |
+| `users` | Team accounts with roles (admin-managed) |
+| `leads` | All lead submissions from all domains |
+| `websites` | Registered ClickMasters websites |
+| `services` | Available service categories |
+| `connectedintegrations` | ERP Project Connector links (public key + scopes) |
+| `integrationaudits` | Authorize / revoke / confirm-failure audit log |
 
 ## Lead Schema (Mongoose)
 
@@ -315,8 +362,9 @@ External websites can POST leads without any authentication token.
   service: String,
   status: String (enum: New/Contacted/Closed/Spam, default: "New"),
   assigneeId: ObjectId (ref: User, nullable),
-  assigneeName: String,
+  assignee: String (denormalized display name),
   isTest: Boolean (default false — connection-check leads, excluded from stats),
+  isDuplicate: Boolean (default false — flagged when same email/phone arrived within 24h),
   activities: [{ type, message, actor, actorId, createdAt }],
   source: String,
   referrer: String,
@@ -329,6 +377,33 @@ External websites can POST leads without any authentication token.
   deviceType: String,
   userAgent: String,
   notes: [{ text: String, createdAt: Date, updatedAt: Date }],
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+## ConnectedIntegration Schema (Mongoose)
+
+```
+{
+  provider: String (default "clickmasters-erp"),
+  externalCompanyId: String (ERP companyId),
+  companyName: String,
+  integrationConnectionId: String (ERP connection _id),
+  publicKey: String (ERP Ed25519 public key — never private key),
+  keyId: String,
+  certificateFingerprint: String,
+  scopes: [String],
+  status: String (enum: active/revoked),
+  connectedByUserId: ObjectId (ref: User),
+  connectedByName: String,
+  connectedByEmail: String,
+  requestId: String,
+  jti: String,
+  targetSystem: String (default "lead-crm"),
+  connectedAt: Date,
+  revokedAt: Date,
+  revokedByUserId: ObjectId (ref: User),
   createdAt: Date,
   updatedAt: Date
 }
@@ -347,6 +422,7 @@ External websites can POST leads without any authentication token.
 - MongoDB injection protection
 - XSS protection
 - Environment variables for all secrets
+- ERP integration: shared `INTEGRATION_CONFIRM_SECRET` as header `X-Integration-Secret` (server-only); opaque one-time `requestId`; ERP public key stored on CRM — private keys never leave ERP
 
 ---
 
@@ -364,6 +440,13 @@ External websites can POST leads without any authentication token.
 
 The following features are documented in the system requirements but **not yet implemented** — the architecture supports adding them without major refactoring.
 
+## ERP Project Connectors (remaining)
+
+- ✅ Phase 1–2: ERP connect + CRM consent/confirm (`plan.md`)
+- Phase 3: Web Leads via integration credentials (replace hard-coded CRM JWT); scope-enforced APIs
+- Phase 4: Alpha AI Tracker (same handshake pattern)
+- Phase 5: Disconnect webhook CRM→ERP, key rotation, rate limits
+
 ## Multi-Event Tracking
 
 - WhatsApp button clicks
@@ -372,9 +455,10 @@ The following features are documented in the system requirements but **not yet i
 
 ## Duplicate Prevention (Unique Visitor Logic)
 
-- Unique visitor ID via cookie/localStorage + fingerprinting
-- Configurable time window (24 hours / session)
-- Each interaction type deduplicated independently
+- ✅ **Email/phone dedupe implemented** — repeat submissions with the same email or phone within 24h are flagged `isDuplicate` (see Duplicate-Lead Detection).
+- Unique visitor ID via cookie/localStorage + fingerprinting (`TODO`)
+- Configurable time window (currently hardcoded `DUPLICATE_WINDOW_HOURS = 24` in `lib/models/Lead.js`)
+- Each interaction type deduplicated independently (`TODO`)
 
 ## Visitor Behavior & Journey Tracking
 
@@ -450,7 +534,12 @@ SMTP_PORT=587
 SMTP_USER=software.clickmasters@gmail.com
 SMTP_PASS=cdlrjbifnewlltss
 NEXT_PUBLIC_API_URL=
+ERP_API_BASE_URL=http://192.168.88.36:3000
+INTEGRATION_CONFIRM_SECRET=clickmasters-integration-confirm-dev-change-me
+CRM_EXTERNAL_COMPANY_ID=clickmasters-lead-crm
 ```
+
+`ERP_API_BASE_URL` and `INTEGRATION_CONFIRM_SECRET` must match the ERP Project Connectors setup (secret is sent as HTTP header `X-Integration-Secret`, not as an env var name). See `.env.example` and `plan.md`.
 
 ---
 

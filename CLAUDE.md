@@ -3,11 +3,13 @@
 ## Project Overview
 Fullstack Lead Management System built with **Next.js 16 (App Router)**, **React 19**, **Tailwind CSS v4**, and **MongoDB (Mongoose)**. The application runs both the UI frontend and API backend on a **single port (`3000`)** in a single unified Node process.
 
+For full product context (roles, pages, ERP integration), see **`AGENTS.md`**. For ERP ↔ CRM Project Connectors plan, see **`plan.md`**.
+
 ---
 
 ## Commands
 
-- **Development**: `npm run dev` (Runs database seed script `node scripts/seed.js` and starts Next.js dev server on port `3000`)
+- **Development**: `npm run dev` (Starts Next.js dev server on port `3000`; DB auto-seeds on connect)
 - **Seed Database**: `npm run seed` (Manually seeds admin user, default websites, and services into MongoDB)
 - **Build**: `npm run build` (Compiles production build)
 - **Start Production**: `npm start` (Runs production Next.js server on port `3000`)
@@ -20,48 +22,58 @@ Fullstack Lead Management System built with **Next.js 16 (App Router)**, **React
 ```
 lead-management/
 ├── app/                         # Next.js App Router (Pages & Components)
-│   ├── api/                     # API Route Handlers (Single-port HTTP Endpoints)
-│   │   ├── auth/login/route.js  # POST — Admin login & JWT token generation
+│   ├── (dashboard)/             # Authenticated shell (sidebar + navbar)
+│   │   ├── dashboard/           # Analytics & charts
+│   │   ├── leads/               # Lead table & details
+│   │   ├── websites/            # Website CRUD + health
+│   │   ├── services/            # Services
+│   │   ├── users/               # Admin user management
+│   │   └── integrations/        # Connected Apps (ERP links)
+│   ├── api/                     # API Route Handlers (single-port)
+│   │   ├── auth/login/route.js  # POST — Login & JWT
 │   │   ├── health/route.js      # GET — Health check
-│   │   ├── leads/
-│   │   │   ├── route.js         # GET (Filter/Search/Pagination) & POST (Create Lead)
-│   │   │   ├── [id]/route.js    # GET, PUT, DELETE lead by ID
-│   │   │   ├── stats/route.js   # GET — Dashboard status metrics
-│   │   │   └── charts/route.js  # GET — Daily & category analytics
-│   │   ├── services/route.js    # GET — Services list
-│   │   └── websites/route.js    # GET — Websites list
-│   ├── dashboard/               # Main dashboard UI
-│   ├── leads/                   # Lead details & listing views
-│   └── login/                   # Admin login page
-├── lib/                         # Shared utilities, backend models & services
-│   ├── db.js                    # Mongoose connection manager & auto-seed runner
-│   ├── auth.js                  # JWT token signing & request verification
-│   ├── config.js                # System constants (statuses, services, websites)
+│   │   ├── leads/               # CRUD + stats + charts + bulk
+│   │   ├── services/route.js
+│   │   ├── websites/            # CRUD + stats + connection check
+│   │   ├── users/               # Admin user CRUD
+│   │   └── integrations/        # ERP authorize proxy, confirm, disconnect
+│   ├── connect/authorize/       # ERP consent page (no dashboard chrome)
+│   ├── login/                   # Login (?returnTo= supported)
+│   └── preview/                 # Email preview
+├── lib/
+│   ├── db.js                    # Mongoose connection + auto-seed
+│   ├── auth.js                  # JWT sign/verify + role guards
+│   ├── config.js                # Statuses, roles, integration constants
 │   ├── api.js                   # Client-side API fetch wrapper
-│   ├── models/                  # Mongoose data schemas
-│   │   ├── Lead.js              # Lead model with indexing & text search
-│   │   ├── User.js              # Admin user model & bcrypt password comparison
-│   │   └── Website.js           # Website & Service models
-│   └── services/                # Business logic services
-│       ├── email.js             # Nodemailer lead notification handler
-│       ├── emailTemplates.js    # HTML/Text email templates for visitor & team
-│       └── geo.js               # Device, browser, IP & OS detection
-├── scripts/
-│   └── seed.js                  # Standalone CLI database seed script
-├── .env.local                   # Environment configuration variables
+│   ├── models/
+│   │   ├── Lead.js
+│   │   ├── User.js
+│   │   ├── Website.js
+│   │   ├── ConnectedIntegration.js
+│   │   └── IntegrationAudit.js
+│   └── services/
+│       ├── email.js
+│       ├── emailTemplates.js
+│       ├── erpIntegration.js    # ERP authorize-request + confirm client
+│       └── geo.js
+├── scripts/seed.js
+├── .env                         # Environment configuration (see .env.example)
+├── plan.md                      # ERP Project Connectors integration plan
+├── AGENTS.md                    # Full product / agent context
 └── package.json
 ```
 
 ---
 
-## Environment Configuration (.env.local)
+## Environment Configuration (`.env`)
 
-Environment variables are stored in `.env.local` at the root:
+Copy from `.env.example`. Typical keys:
 
 ```ini
 # Server & Database
 NODE_ENV=development
 MONGODB_URI=mongodb://localhost:27017/clickmasters_leads
+CLIENT_ORIGIN=http://localhost:3000
 
 # JWT Authentication
 JWT_SECRET=change_me_to_a_long_random_string
@@ -69,7 +81,7 @@ JWT_EXPIRES_IN=7d
 
 # Initial Admin User Credentials
 ADMIN_EMAIL=admin@clickmasters.com
-ADMIN_PASSWORD=1234
+ADMIN_PASSWORD=change_me
 
 # Frontend API URL (empty string for same-origin single-port requests)
 NEXT_PUBLIC_API_URL=
@@ -77,11 +89,18 @@ NEXT_PUBLIC_API_URL=
 # Email Notifications (SMTP)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=software.clickmasters@gmail.com
-SMTP_PASS=cdlrjbifnewlltss
-SMTP_FROM=software.clickmasters@gmail.com
-NOTIFY_TO=software.clickmasters@gmail.com
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+NOTIFY_TO=
+
+# ERP Project Connectors (Phase 2) — must match ERP
+ERP_API_BASE_URL=http://192.168.88.36:3000
+INTEGRATION_CONFIRM_SECRET=clickmasters-integration-confirm-dev-change-me
+CRM_EXTERNAL_COMPANY_ID=clickmasters-lead-crm
 ```
+
+> `INTEGRATION_CONFIRM_SECRET` is sent as HTTP header **`X-Integration-Secret`** (that string is not an env var name).
 
 ---
 
@@ -106,4 +125,7 @@ NOTIFY_TO=software.clickmasters@gmail.com
    All client-side API requests in `lib/api.js` use relative path `/api/...` when `NEXT_PUBLIC_API_URL` is empty, avoiding CORS issues.
 
 4. **Automatic Seeding**:
-   The `npm run dev` script runs `node scripts/seed.js` before starting `next dev`, ensuring admin, website, and service records exist in MongoDB.
+   On `connectDB()`, admin / websites / services are seeded if missing.
+
+5. **ERP integration trust**:
+   Never expose `INTEGRATION_CONFIRM_SECRET` to the browser. Consent page only carries `requestId`; confirm runs in CRM API routes via `lib/services/erpIntegration.js`.

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, setToken, setUser } from "@/lib/api";
 
-export default function LoginPage() {
+/** Only same-origin relative paths — blocks open redirects. */
+function resolveReturnTo(raw) {
+  if (!raw || typeof raw !== "string") return "/dashboard";
+  let decoded = raw;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return "/dashboard";
+  }
+  if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/dashboard";
+  return decoded;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,7 +36,7 @@ export default function LoginPage() {
       const { token, user } = await api.login(email, password);
       setToken(token);
       setUser(user);
-      router.push("/dashboard");
+      router.push(resolveReturnTo(searchParams.get("returnTo")));
     } catch (err) {
       toast.error(err.message || "Login failed");
     } finally {
@@ -85,5 +99,17 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-muted/30" />
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -409,9 +409,19 @@ export default function LeadDetailsPage() {
                       <div className="relative z-10 mt-1.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center">
                         <div
                           className={
-                            a.type === "created"
-                              ? "h-2.5 w-2.5 rounded-full border-2 border-primary bg-primary"
-                              : "h-2.5 w-2.5 rounded-full border-2 border-primary bg-background"
+                            {
+                              created:
+                                "h-2.5 w-2.5 rounded-full border-2 border-primary bg-primary",
+                              note: "h-2.5 w-2.5 rounded-full border-2 border-emerald-500 bg-emerald-500",
+                              assignee:
+                                "h-2.5 w-2.5 rounded-full border-2 border-blue-500 bg-blue-500",
+                              service:
+                                "h-2.5 w-2.5 rounded-full border-2 border-purple-500 bg-purple-500",
+                              status: "h-2.5 w-2.5 rounded-full border-2 border-amber-500 bg-amber-500",
+                              bulk_status:
+                                "h-2.5 w-2.5 rounded-full border-2 border-amber-500 bg-amber-500",
+                            }[a.type] ||
+                            "h-2.5 w-2.5 rounded-full border-2 border-primary bg-background"
                           }
                         />
                       </div>

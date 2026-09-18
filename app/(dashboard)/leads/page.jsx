@@ -31,12 +31,15 @@ import {
   Bookmark,
   Save,
   CalendarDays,
+  Clock,
 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
+import { OVERDUE_DAYS } from "@/lib/config";
 import { Combobox } from "@/components/ui/combobox";
 
 const ALL_COLUMNS = [
   { key: "name", label: "Name" },
+  { key: "score", label: "Score" },
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
   { key: "website", label: "Website" },
@@ -74,6 +77,9 @@ export default function LeadsPage() {
   // Date range
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Assignee filter (deep-linkable: ?assigneeId=me|none|<userId>)
+  const [assigneeId, setAssigneeId] = useState("");
 
   // Saved views (localStorage)
   const [savedViews, setSavedViews] = useState([]);
@@ -122,6 +128,15 @@ export default function LeadsPage() {
       const raw = localStorage.getItem("savedViews");
       if (raw) setSavedViews(JSON.parse(raw));
     } catch {}
+  }, []);
+
+  // Deep-link support: /leads?assigneeId=me|none&status=New (dashboard widgets)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const a = sp.get("assigneeId");
+    if (a) setAssigneeId(a);
+    const st = sp.get("status");
+    if (st) setStatus(st);
   }, []);
 
   function saveCurrentView() {
@@ -195,6 +210,7 @@ export default function LeadsPage() {
       if (service) params.service = service;
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (assigneeId) params.assigneeId = assigneeId;
       const res = await api.getLeads(params);
       setLeads(res.data || []);
       setTotal(res.total || 0);
@@ -205,7 +221,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, website, service, startDate, endDate, sort, order]);
+  }, [page, search, status, website, service, startDate, endDate, sort, order, assigneeId]);
 
   useEffect(() => {
     loadFilters();
@@ -242,11 +258,12 @@ export default function LeadsPage() {
     setService("");
     setStartDate("");
     setEndDate("");
+    setAssigneeId("");
     setPage(1);
   }
 
   function hasActiveFilters() {
-    return search || status || website || service || startDate || endDate;
+    return search || status || website || service || startDate || endDate || assigneeId;
   }
 
   // --- CSV Export ---
@@ -386,6 +403,14 @@ export default function LeadsPage() {
   }));
   const serviceOptions = services.map((s) => ({ label: s, value: s }));
 
+  // A lead is "overdue" when it's unassigned, still "New", and older than OVERDUE_DAYS.
+  function isOverdue(lead) {
+    const UNASSIGNED = !lead.assigneeId;
+    const stillNew = lead.status === "New";
+    const ageDays = (Date.now() - new Date(lead.createdAt).getTime()) / (24 * 60 * 60 * 1000);
+    return UNASSIGNED && stillNew && ageDays > OVERDUE_DAYS;
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -512,7 +537,7 @@ export default function LeadsPage() {
             className={selectCls}
           >
             <option value="">All Statuses</option>
-            {["New", "Contacted", "Closed", "Spam"].map((s) => (
+            {["New", "Contacted", "Closed Won", "Closed Lost", "Spam"].map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
@@ -607,7 +632,7 @@ export default function LeadsPage() {
             className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring"
           >
             <option value="">Set status…</option>
-            {["New", "Contacted", "Closed", "Spam"].map((s) => (
+            {["New", "Contacted", "Closed Won", "Closed Lost", "Spam"].map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
@@ -742,14 +767,33 @@ export default function LeadsPage() {
                                 Test
                               </span>
                             )}
+                            {lead.isDuplicate && (
+                              <span
+                                title="Recent lead with the same email or phone"
+                                className="inline-flex items-center rounded-full border border-dashed border-violet-500/50 bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
+                              >
+                                Duplicate
+                              </span>
+                            )}
                           </div>
                         ) : col.key === "assignee" ? (
                           <span className={lead.assignee ? "text-foreground" : "text-muted-foreground/40 italic"}>
                             {lead.assignee || "Unassigned"}
                           </span>
                         ) : col.key === "createdAt" ? (
-                          <span className="text-muted-foreground" title={new Date(lead.createdAt).toLocaleString()}>
-                            {formatRelativeTime(lead.createdAt)}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="text-muted-foreground" title={new Date(lead.createdAt).toLocaleString()}>
+                              {formatRelativeTime(lead.createdAt)}
+                            </span>
+                            {isOverdue(lead) && (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 dark:bg-red-500/15 dark:text-red-400"
+                                title={`Unassigned New lead older than ${OVERDUE_DAYS} days`}
+                              >
+                                <Clock className="size-2.5" />
+                                Overdue
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">

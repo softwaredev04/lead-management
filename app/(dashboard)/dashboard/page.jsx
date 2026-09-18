@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { OVERDUE_DAYS } from "@/lib/config";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -25,6 +26,13 @@ import {
   MessageSquare,
   PhoneCall,
   CheckCircle,
+  XCircle,
+  Target,
+  Inbox,
+  Clock,
+  Zap,
+  RefreshCw,
+  BarChart3,
 } from "lucide-react";
 import {
   AreaChart,
@@ -127,7 +135,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stat Cards */}
+      {/* Stat Cards - Row 1: Core metrics */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
@@ -137,15 +145,124 @@ export default function DashboardPage() {
               { label: "Total Leads", value: stats?.total ?? 0, icon: Users },
               { label: "Today", value: stats?.today ?? 0, icon: Calendar },
               { label: "This Month", value: stats?.thisMonth ?? 0, icon: TrendingUp },
-              { label: "New", value: stats?.new ?? 0, icon: MessageSquare, color: "new" },
-              { label: "Contacted", value: stats?.contacted ?? 0, icon: PhoneCall, color: "contacted" },
-              { label: "Closed", value: stats?.closed ?? 0, icon: CheckCircle, color: "closed" },
+              { label: "Conversion Rate", value: `${stats?.conversionRate ?? 0}%`, icon: Target, color: "default" },
+              { label: "Avg Score", value: stats?.avgLeadScore ?? 0, icon: Zap, color: "default" },
+              { label: "Follow-up Due", value: stats?.followUpDue ?? 0, icon: Clock, color: (stats?.followUpDue ?? 0) > 0 ? "contacted" : "default", trend: "Assigned, no activity 3+ days" },
             ].map((card, i) => (
               <div key={card.label} style={{ animationDelay: `${(i + 1) * 0.05}s` }}>
                 <StatCard {...card} />
               </div>
             ))}
       </div>
+
+      {/* Stat Cards - Row 2: Status breakdown */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {!loading && [
+          { label: "New", value: stats?.new ?? 0, icon: MessageSquare, color: "new" },
+          { label: "Contacted", value: stats?.contacted ?? 0, icon: PhoneCall, color: "contacted" },
+          { label: "Closed Won", value: stats?.closedWon ?? 0, icon: CheckCircle, color: "closed" },
+          { label: "Closed Lost", value: stats?.closedLost ?? 0, icon: XCircle, color: "spam" },
+        ].map((card, i) => (
+          <div key={card.label} style={{ animationDelay: `${(i + 1) * 0.05}s` }}>
+            <StatCard {...card} />
+          </div>
+        ))}
+      </div>
+
+      {/* Focus & Workload */}
+      {!loading && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle>My Focus</CardTitle>
+              <p className="text-xs text-muted-foreground">Where to work next</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Link
+                href="/leads?assigneeId=me"
+                className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-center gap-2 text-sm">
+                  <Target className="size-4 text-primary" />
+                  <span className="text-foreground">My open leads</span>
+                </div>
+                <span className="text-lg font-bold text-foreground">{stats?.myLeads ?? 0}</span>
+              </Link>
+              <Link
+                href="/leads?assigneeId=none"
+                className="flex items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-center gap-2 text-sm">
+                  <Inbox className="size-4 text-amber-500" />
+                  <span className="text-foreground">Unassigned</span>
+                </div>
+                <span className="text-lg font-bold text-foreground">{stats?.unassigned ?? 0}</span>
+              </Link>
+              <Link
+                href="/leads?assigneeId=none&status=New"
+                className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${
+                  (stats?.overdue ?? 0) > 0
+                    ? "border-red-500/30 bg-red-500/5 hover:bg-red-500/10"
+                    : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock
+                    className={`size-4 ${(stats?.overdue ?? 0) > 0 ? "text-red-500" : "text-muted-foreground"}`}
+                  />
+                  <span className="text-foreground">
+                    Overdue
+                    <span className="block text-xs text-muted-foreground">
+                      Unassigned New leads &gt; {OVERDUE_DAYS} days
+                    </span>
+                  </span>
+                </div>
+                <span
+                  className={`text-lg font-bold ${(stats?.overdue ?? 0) > 0 ? "text-red-500" : "text-foreground"}`}
+                >
+                  {stats?.overdue ?? 0}
+                </span>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="animate-fade-in lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Team Workload</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Open leads per assignee (top 6) — click a name to see their queue
+              </p>
+            </CardHeader>
+            <CardContent>
+              {!stats?.workload?.length ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  No assigned leads yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(() => {
+                    const max = Math.max(...stats.workload.map((w) => w.count), 1);
+                    return stats.workload.map((w) => (
+                      <div key={w.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-foreground">{w.name}</span>
+                          <span className="text-muted-foreground">{w.count} open</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary/70"
+                            style={{ width: `${(w.count / max) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-3">

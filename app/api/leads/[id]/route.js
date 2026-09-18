@@ -6,6 +6,7 @@ import { verifyAuth, requireRole, requireAdmin } from "@/lib/auth";
 import User from "@/lib/models/User";
 import { WRITE_ROLES } from "@/lib/config";
 import { LEAD_STATUSES, SERVICES } from "@/lib/config";
+import { notifyAssignment } from "@/lib/services/email";
 
 export async function GET(request, { params }) {
   const { response } = verifyAuth(request);
@@ -32,6 +33,8 @@ const editSchema = z.object({
   newNote: z.string().min(1).optional(),
   assignee: z.string().optional(), // legacy plain-string assignment
   assigneeId: z.string().nullable().optional(), // real user assignment
+  closedReason: z.string().optional(),
+  dealValue: z.number().min(0).optional(),
 });
 
 export async function PUT(request, { params }) {
@@ -52,10 +55,12 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    const { status, service, notes, newNote, assignee, assigneeId } = parsed.data;
+    const { status, service, notes, newNote, assignee, assigneeId, closedReason, dealValue } = parsed.data;
     const actor = user?.name || user?.email || "System";
     const actorId = user?.id || null;
     const activities = [];
+    let newlyAssignedUser = null;
+    let hasActivity = false;
 
     if (status !== undefined && status !== existing.status) {
       activities.push({
@@ -65,6 +70,17 @@ export async function PUT(request, { params }) {
         actorId,
       });
       existing.status = status;
+      hasActivity = true;
+    }
+
+    if (closedReason !== undefined && closedReason !== existing.closedReason) {
+      existing.closedReason = closedReason;
+      hasActivity = true;
+    }
+
+    if (dealValue !== undefined && dealValue !== existing.dealValue) {
+      existing.dealValue = dealValue;
+      hasActivity = true;
     }
 
     if (service !== undefined && service !== existing.service) {
@@ -75,6 +91,7 @@ export async function PUT(request, { params }) {
         actorId,
       });
       existing.service = service;
+      hasActivity = true;
     }
 
     if (assigneeId !== undefined) {
@@ -86,6 +103,7 @@ export async function PUT(request, { params }) {
             actor,
             actorId,
           });
+          hasActivity = true;
         }
         existing.assigneeId = null;
         existing.assignee = "";
@@ -101,9 +119,11 @@ export async function PUT(request, { params }) {
             actor,
             actorId,
           });
+          hasActivity = true;
         }
         existing.assigneeId = assignedUser._id;
         existing.assignee = assignedUser.name;
+        newlyAssignedUser = assignedUser;
       }
     } else if (assignee !== undefined && assignee !== existing.assignee) {
       activities.push({
@@ -113,12 +133,14 @@ export async function PUT(request, { params }) {
         actorId,
       });
       existing.assignee = assignee;
+      hasActivity = true;
     }
 
     if (newNote) {
       existing.notes.push({ text: newNote, createdAt: new Date(), updatedAt: new Date() });
       const preview = newNote.length > 80 ? `${newNote.slice(0, 80)}…` : newNote;
       activities.push({ type: "note", message: `Added a note: "${preview}"`, actor, actorId });
+      hasActivity = true;
     }
 
     if (notes !== undefined) {
@@ -132,7 +154,19 @@ export async function PUT(request, { params }) {
     if (!Array.isArray(existing.activities)) existing.activities = [];
     if (activities.length) existing.activities.push(...activities);
 
+    // Update lastActivityAt whenever anything meaningful changed
+    if (hasActivity) existing.lastActivityAt = new Date();
+
+    // Recalculate lead score (schema fields may have changed)
+    existing.leadScore = Lead.calculateScore(existing);
+
     await existing.save();
+
+    // Assignment email (fire-and-forget — never blocks or fails the request)
+    if (newlyAssignedUser) {
+      notifyAssignment(existing._id, newlyAssignedUser._id, actor).catch(() => {});
+    }
+
     return NextResponse.json(existing);
   } catch (error) {
     console.error("Lead update error:", error);
