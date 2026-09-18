@@ -192,24 +192,18 @@ Admin-only user management: add, view, edit (name/email/role), activate/deactiva
 
 ## Connected Apps (`/integrations`)
 
-ERP **Project Connectors** handshake (Phase 2 — implemented). Sidebar: **Connected Apps**.
+ERP **Project Connectors** handshake (Phases 2–5a). See **`leadcrmplan.md` / `erpplan.md` §00 Session summary** for full journey, issues, and fixes.
 
 | Step | What happens |
 | ---- | ------------ |
 | 1 | ERP admin clicks Connect Lead CRM → opens `/connect/authorize?request=<requestId>&target=lead-crm` |
 | 2 | If not logged in → `/login?returnTo=...` then back to consent |
-| 3 | CRM proxies `GET {ERP_API_BASE_URL}/integrations/authorize-request/:requestId` (server-side) |
-| 4 | Consent UI shows company, requester, scopes, expiry — **Cancel** or **Authorize** |
-| 5 | Authorize → create/update `ConnectedIntegration` → CRM `POST {ERP}/integrations/confirm` with header `X-Integration-Secret` |
-| 6 | Success → `/integrations`; Cancel never calls confirm (ERP request expires) |
+| 3 | CRM proxies ERP authorize-request (must include `publicKey` PEM) |
+| 4 | Authorize → `ConnectedIntegration` + ERP confirm |
+| 5 | Web Leads via signed `GET /api/integrations/leads` |
+| 6 | Disconnect → CRM revoke + notify ERP; live poll 5s; ERP webhook inbound |
 
-**Trust model:** browser only carries opaque `requestId`. Integration trust is server-to-server confirm + stored ERP **public key** — never treat localStorage JWT as the ERP↔CRM link. CRM never stores ERP private keys.
-
-**Disconnect (admin):** revokes CRM-side status to `revoked` — ERP signed lead APIs then fail (`No active integration`). Notifying ERP is Phase 5.
-
-**Scoped leads (Phase 3):** `GET /api/integrations/leads` — ERP calls with `X-Integration-Secret` + Ed25519 headers; CRM verifies against stored `publicKey` and scope `crm.leads.read`.
-
-Full plan: `leadcrmplan.md` / `erpplan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CRM_EXTERNAL_COMPANY_ID` (see `.env.example`).
+**Trust:** browser only carries `requestId`. Never store ERP private keys. Env: `ERP_API_BASE_URL`, `INTEGRATION_CONFIRM_SECRET`, `CRM_EXTERNAL_COMPANY_ID`.
 
 ---
 
@@ -276,6 +270,7 @@ Full plan: `leadcrmplan.md` / `erpplan.md`. Env: `ERP_API_BASE_URL`, `INTEGRATIO
 | POST   | `/api/integrations/confirm` | Create ConnectedIntegration + ERP confirm |
 | POST   | `/api/integrations/:id/disconnect` | Revoke CRM-side link (admin)        |
 | GET    | `/api/integrations/leads` | ERP-signed scoped leads (secret + Ed25519; scope `crm.leads.read`) |
+| POST   | `/api/integrations/webhook/status` | ERP→CRM status sync (`revoked`/`active`, secret header) |
 
 ## Lead POST Payload (External Form Submission)
 
